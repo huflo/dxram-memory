@@ -1,31 +1,25 @@
 package de.hhu.bsinfo;
 
-import de.hhu.bsinfo.dxram.mem.CIDTable;
-import de.hhu.bsinfo.soh.SmallObjectHeap;
-import de.hhu.bsinfo.soh.StorageUnsafeMemory;
+import de.hhu.bsinfo.dxram.mem.MemoryControl;
+import de.hhu.bsinfo.soh.SmallObjectHeapAnalyzer;
 
 public class DXRAMMemory{
-    private static CIDTable table;
-    private static SmallObjectHeap heap;
 
     public static void main(String[] args){
         long heapSize = 1024*1024*1024; //1GB
-        int blockSize = 4*1024*1024;
         short nodeID = 0;
 
+        MemoryControl memoryControl = new MemoryControl(nodeID, heapSize);
 
-        heap = new SmallObjectHeap(new StorageUnsafeMemory(), heapSize, blockSize);
-        table = new CIDTable(nodeID);
-        table.initialize(heap);
+        memoryControl.create(50);
+        memoryControl.create(50);
+        memoryControl.delete(1);
 
-        table.printDebugInfos();
+        memoryControl.getCIDTable().printDebugInfos();
 
+        SmallObjectHeapAnalyzer analyzer = new SmallObjectHeapAnalyzer(memoryControl.getHeap());
+        System.out.println(analyzer.analyze().toString());
 
-
-        destroy();
-    }
-
-    private static void destroy(){
-        heap.destroy();
+        memoryControl.destroy();
     }
 }
