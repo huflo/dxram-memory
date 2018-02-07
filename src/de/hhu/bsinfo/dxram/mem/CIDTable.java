@@ -13,6 +13,7 @@
 
 package de.hhu.bsinfo.dxram.mem;
 
+import de.hhu.bsinfo.utils.BitMask;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -28,15 +29,17 @@ import de.hhu.bsinfo.utils.ArrayListLong;
  *
  * @author Florian Klein, florian.klein@hhu.de, 13.02.2014
  * @author Stefan Nothaas, stefan.nothaas@hhu.de, 11.11.2015
+ * @author Florian Hucke, florian.hucke@hhu.de, 06.02.2018
  */
 public final class CIDTable {
+    private static final byte ENTRY_SIZE = 8;
+    private static BitMask bitMask = new BitMask(ENTRY_SIZE);
 
-    private static final byte ENTRY_SIZE = 5;
     static final byte LID_TABLE_LEVELS = 4;
-    private static final long BITMASK_ADDRESS = 0x7FFFFFFFFFL;
-    private static final long FULL_FLAG = 0x8000000000L;
+    private static final long BITMASK_ADDRESS = bitMask.checkedCreate(43,0);
+    private static final long FULL_FLAG = bitMask.checkedCreate(1, 63);
     private static final long FREE_ENTRY = 0;
-    private static final long ZOMBIE_ENTRY = 0xFFFFFFFFFFL;
+    private static final long ZOMBIE_ENTRY = bitMask.create(64, 0);
     private static final Logger LOGGER = LogManager.getFormatterLogger(CIDTable.class.getSimpleName());
     // statistics recorder
     //private static final StatisticsOperation SOP_CREATE_NID_TABLE = StatisticsRecorderManager.getOperation(MemoryManagerComponent.class, "CreateNIDTable");
@@ -485,7 +488,8 @@ public final class CIDTable {
      * @return the entry
      */
     long readEntry(final long p_addressTable, final long p_index) {
-        return m_rawMemory.readLong(p_addressTable, ENTRY_SIZE * p_index) & 0xFFFFFFFFFFL;
+        //TODO Handle read access on list
+        return m_rawMemory.readLong(p_addressTable, ENTRY_SIZE * p_index); //& 0xFFFFFFFFFFL;
     }
 
     /**
@@ -499,12 +503,15 @@ public final class CIDTable {
      *     the entry
      */
     void writeEntry(final long p_addressTable, final long p_index, final long p_entry) {
-        long value;
+        //TODO Handle write access on list
 
-        value = m_rawMemory.readLong(p_addressTable, ENTRY_SIZE * p_index) & 0xFFFFFF0000000000L;
-        value += p_entry & 0xFFFFFFFFFFL;
+        //long value;
 
-        m_rawMemory.writeLong(p_addressTable, ENTRY_SIZE * p_index, value);
+        //value = m_rawMemory.readLong(p_addressTable, ENTRY_SIZE * p_index) & 0xFFFFFF0000000000L;
+        //value += p_entry & 0xFFFFFFFFFFL;
+
+        //m_rawMemory.writeLong(p_addressTable, ENTRY_SIZE * p_index, value);
+        m_rawMemory.writeLong(p_addressTable, ENTRY_SIZE * p_index, p_entry);
     }
 
     /**
