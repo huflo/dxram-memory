@@ -540,7 +540,7 @@ public final class CIDTable {
         // #ifdef STATISTICS
         //MemoryManagerComponent.SOP_MALLOC.leave();
         // #endif /* STATISTICS */
-        if (ret != -1) {
+        if (ret != SmallObjectHeap.INVALID_ADDRESS) {
             m_rawMemory.set(ret, NID_TABLE_SIZE, (byte) 0);
             m_totalMemoryTables += NID_TABLE_SIZE;
             m_tableCount++;
@@ -569,7 +569,7 @@ public final class CIDTable {
         // #ifdef STATISTICS
         //MemoryManagerComponent.SOP_MALLOC.leave();
         // #endif /* STATISTICS */
-        if (ret != -1) {
+        if (ret != SmallObjectHeap.INVALID_ADDRESS) {
             m_rawMemory.set(ret, LID_TABLE_SIZE, (byte) 0);
             m_totalMemoryTables += LID_TABLE_SIZE;
             m_tableCount++;
