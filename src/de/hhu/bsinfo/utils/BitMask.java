@@ -8,11 +8,11 @@ package de.hhu.bsinfo.utils;
  */
 public class BitMask {
 
-    final int bitSite;
+    final int bitSize;
     long control = 0x0;
 
     public BitMask(int byteSizeForBitMask){
-        bitSite = byteSizeForBitMask * 8;
+        bitSize = byteSizeForBitMask * 8;
     }
 
     /**
@@ -39,7 +39,24 @@ public class BitMask {
      * @return a bit mask
      */
     public long create(long numberOfOnes, int offset){
-        assert numberOfOnes+offset <= bitSite : "bit mask result in a overflow";
+
+
+        long ret = 0;
+        for (int i = 0; i < numberOfOnes; i++) {
+            ret = (ret << 1) | 1;
+        }
+
+        return ret << offset;
+    }
+
+    /**
+     * Static method to create a bit mask
+     * @param numberOfOnes number of ones
+     * @param offset offset of the ones
+     * @return a bit mask as long variable
+     */
+    public static long createMask(long numberOfOnes, int offset){
+        assert numberOfOnes+offset <= Long.SIZE : "bit mask result in a overflow";
 
         long ret = 0;
         for (int i = 0; i < numberOfOnes; i++) {
