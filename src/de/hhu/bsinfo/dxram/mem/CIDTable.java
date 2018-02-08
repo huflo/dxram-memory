@@ -36,8 +36,31 @@ public final class CIDTable {
     private static BitMask bitMask = new BitMask(ENTRY_SIZE);
 
     static final byte LID_TABLE_LEVELS = 4;
+
+    //43 Bit: the address size of a chunk
     private static final long BITMASK_ADDRESS = bitMask.checkedCreate(43,0);
-    private static final long FULL_FLAG = bitMask.checkedCreate(1, 63);
+
+    // 1 Bit: no remove allowed (e.g. to purpose a fast path)
+    private static final long BITMASK_NOT_REMOVEABLE = bitMask.checkedCreate(1, 43);
+
+    // 1 Bit: no move allowed (e.g. to purpose defragmentation)
+    private static final long BITMASK_NOT_MOVEABLE = bitMask.checkedCreate(1, 44);
+
+    //10 Bit: as external length field
+    private static final long BITMASK_CHUNK_SIZE = bitMask.checkedCreate(10, 45);
+
+    // 1 Bit: Object length field is bigger than 2^10 (the chunk has a additional length field)
+    private static final long BITMASK_EMBEDDED_LENGTH_FIELD = bitMask.checkedCreate(1,55);
+
+    // 7 Bit: Count the parallel read access
+    private static final long BITMASK_READ = bitMask.checkedCreate(7, 56);
+
+    // 1 Bit: Mark a wanted write access
+    private static final long BITMASK_WRITE = bitMask.checkedCreate(1, 63);
+
+    //not moveable implies not removeable so we can use this combination for a full list or a unused cid
+    private static final long FULL_FLAG = BITMASK_NOT_MOVEABLE | BITMASK_NOT_REMOVEABLE;
+
     private static final long FREE_ENTRY = 0;
     private static final long ZOMBIE_ENTRY = bitMask.create(64, 0);
     private static final Logger LOGGER = LogManager.getFormatterLogger(CIDTable.class.getSimpleName());
