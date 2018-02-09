@@ -28,7 +28,7 @@ public class MemoryRuntimeException extends RuntimeException {
      * @param p_message
      *     Exception message.
      */
-    MemoryRuntimeException(final String p_message) {
+    public MemoryRuntimeException(final String p_message) {
         super(p_message);
     }
 
@@ -40,7 +40,7 @@ public class MemoryRuntimeException extends RuntimeException {
      * @param p_cause
      *     Other exception causing this
      */
-    MemoryRuntimeException(final String p_message, final Throwable p_cause) {
+    public MemoryRuntimeException(final String p_message, final Throwable p_cause) {
         super(p_message, p_cause);
     }
 }

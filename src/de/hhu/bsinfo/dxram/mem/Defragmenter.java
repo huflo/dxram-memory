@@ -13,8 +13,6 @@
 
 package de.hhu.bsinfo.dxram.mem;
 
-import de.hhu.bsinfo.soh.SmallObjectHeap;
-
 // TODO draft of simple defragmenter (untested)
 // The defragmenter should be triggered when the fragmentation hits 75%.
 // It runs for a set number of entries (or time?) and re-allocates

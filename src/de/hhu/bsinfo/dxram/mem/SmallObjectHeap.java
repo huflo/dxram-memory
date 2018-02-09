@@ -11,12 +11,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
-package de.hhu.bsinfo.soh;
+package de.hhu.bsinfo.dxram.mem;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
+import de.hhu.bsinfo.soh.MemoryRuntimeException;
+import de.hhu.bsinfo.soh.StorageUnsafeMemory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

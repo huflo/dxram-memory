@@ -13,6 +13,8 @@
 
 package de.hhu.bsinfo.soh;
 
+import de.hhu.bsinfo.dxram.mem.SmallObjectHeap;
+
 import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;

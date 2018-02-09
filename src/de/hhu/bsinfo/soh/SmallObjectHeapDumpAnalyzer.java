@@ -13,6 +13,9 @@
 
 package de.hhu.bsinfo.soh;
 
+import de.hhu.bsinfo.dxram.mem.SmallObjectHeap;
+import de.hhu.bsinfo.dxram.mem.SmallObjectHeapAnalyzer;
+
 /**
  * Analyze a heap dump of the SmallObjectHeap
  *

@@ -1,8 +1,6 @@
 package de.hhu.bsinfo.dxram.mem;
 
 import de.hhu.bsinfo.soh.MemoryRuntimeException;
-import de.hhu.bsinfo.soh.SmallObjectHeap;
-import de.hhu.bsinfo.soh.SmallObjectHeapAnalyzer;
 import de.hhu.bsinfo.soh.StorageUnsafeMemory;
 import de.hhu.bsinfo.utils.BitMask;
 
