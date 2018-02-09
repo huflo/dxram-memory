@@ -46,7 +46,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
     long m_baseFreeBlockList;
     int m_freeBlocksListSize = -1;
     long[] m_freeBlockListSizes;
-    Storage m_memory;
+    StorageUnsafeMemory m_memory;
     private int m_maxBlockSize;
     private int m_freeBlocksListCount = -1;
     private Status m_status;
@@ -59,7 +59,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
      * @param p_size
      *         The size of the memory in bytes.
      */
-    public SmallObjectHeap(final Storage p_memory, final long p_size, final int p_maxBlockSize) {
+    public SmallObjectHeap(final StorageUnsafeMemory p_memory, final long p_size, final int p_maxBlockSize) {
         m_memory = p_memory;
         m_status = new Status();
         m_status.m_size = p_size;
@@ -92,7 +92,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
         // Initializes the list sizes
         m_freeBlockListSizes = new long[m_freeBlocksListCount];
 
-        m_freeBlockListSizes[0] = 12;
+        m_freeBlockListSizes[0] = 2*POINTER_SIZE + 2;
         m_freeBlockListSizes[1] = 24;
         m_freeBlockListSizes[2] = 36;
         m_freeBlockListSizes[3] = 48;
@@ -115,7 +115,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
         m_status.m_freeSmall64ByteBlocks = 0;
     }
 
-    public SmallObjectHeap(final String p_memDumpFile, final Storage p_memory) {
+    public SmallObjectHeap(final String p_memDumpFile, final StorageUnsafeMemory p_memory) {
         m_memory = p_memory;
 
         File file = new File(p_memDumpFile);

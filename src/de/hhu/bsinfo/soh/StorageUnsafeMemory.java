@@ -20,6 +20,7 @@ import de.hhu.bsinfo.utils.UnsafeMemory;
  * block of memory
  *
  * @author Stefan Nothaas, stefan.nothaas@hhu.de, 11.11.2015
+ * @author Florian Hucke, florian.hucke@hhu.de, 08.02.2018
  */
 public class StorageUnsafeMemory implements Storage {
     private long m_memoryBase = -1;
@@ -223,5 +224,13 @@ public class StorageUnsafeMemory implements Storage {
         }
 
         return true;
+    }
+
+    public boolean compareAndSwapInt(final long p_ptr, int p_expected_value, int p_new_value){
+        return UnsafeMemory.compareAndSwapInt(m_memoryBase + p_ptr, p_expected_value, p_new_value);
+    }
+
+    public boolean compareAndSwapLong(final long p_ptr, int p_expected_value, int p_new_value){
+        return UnsafeMemory.compareAndSwapLong(m_memoryBase + p_ptr, p_expected_value, p_new_value);
     }
 }
