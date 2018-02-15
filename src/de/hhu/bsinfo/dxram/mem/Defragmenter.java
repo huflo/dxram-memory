@@ -54,12 +54,12 @@ public final class Defragmenter {
         }
 
         for (int i = 0; i < m_curTables.length - 1; i++) {
-            m_curTables[i + 1] = m_cidTable.readEntry(m_curTables[i], m_curTableIndex[i]);
+            m_curTables[i + 1] = m_cidTable.readAddress(m_curTables[i], m_curTableIndex[i]);
         }
     }
 
     public long getAddressCurrentEntry() {
-        return m_cidTable.readEntry(m_curTables[m_curTables.length - 1], m_curTableIndex[m_curTables.length - 1]);
+        return m_cidTable.readAddress(m_curTables[m_curTables.length - 1], m_curTableIndex[m_curTables.length - 1]);
     }
 
     public void replaceAddressCurrenEntry(final long p_newAddress) {

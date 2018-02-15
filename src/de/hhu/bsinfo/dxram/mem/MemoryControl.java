@@ -110,7 +110,7 @@ public final class MemoryControl {
 
     public void readLIDTable(long address){
         for (int i = 0; i < CIDTable.ENTRIES_PER_LID_LEVEL; i++){
-            long entry = m_table.readEntry(address + i * 8, 0);
+            long entry = m_table.readAddress(address + i * 8, 0);
             System.out.println(String.format("0x%016X", entry));
         }
     }

@@ -296,22 +296,22 @@ public final class CIDTable {
             }
 
             if (level > 0) {
-                entry = readEntry(addressTable, index) & ADDRESS.BITMASK;
+                entry = readAddress(addressTable, index);
 
                 if (entry <= 0) {
                     break;
                 }
 
                 // move on to next table
-                addressTable = entry & ADDRESS.BITMASK;
+                addressTable = entry;
             } else {
                 // add table 0 address to cache
                 if (putCache) {
                     m_cache[(int) Thread.currentThread().getId()].putTableLevel0(p_chunkID, addressTable);
                 }
 
-                // get address to chunk from table 0
-                return readEntry(addressTable, index) & BITMASK_ADDRESS;
+                // get entry to chunk from table level 0
+                return readEntry(addressTable, index);
             }
 
             level--;
@@ -498,6 +498,17 @@ public final class CIDTable {
      */
     boolean putChunkIDForReuse(final long p_chunkID) {
         return m_store.put(ChunkID.getLocalID(p_chunkID));
+    }
+
+    /**
+     * Read the address Part of a entry
+     *
+     * @param p_addressTable Address of the table
+     * @param p_index Index of the entry
+     * @return Address part of entry
+     */
+    long readAddress(final long p_addressTable, final long p_index){
+        return (readEntry(p_addressTable, p_index) & ADDRESS.BITMASK);
     }
 
     /**
