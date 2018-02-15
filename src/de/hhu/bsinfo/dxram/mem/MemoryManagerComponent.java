@@ -1200,8 +1200,9 @@ public final class MemoryManagerComponent {//<<
      * @return The value read at the offset of the chunk.
      */
     public long readLong(final long p_chunkID, final int p_offset) {
+
         try {
-            long address = m_cidTable.get(p_chunkID);
+            long address = m_cidTable.get(p_chunkID) & CIDTable.ADDRESS.BITMASK;
             if (address > 0) {
                 return m_rawMemory.readLong(address, p_offset);
             } else {
@@ -1310,8 +1311,9 @@ public final class MemoryManagerComponent {//<<
      * @return True if writing chunk was successful, false otherwise.
      */
     public boolean writeLong(final long p_chunkID, final int p_offset, final long p_value) {
+
         try {
-            long address = m_cidTable.get(p_chunkID);
+            long address = m_cidTable.get(p_chunkID) & CIDTable.ADDRESS.BITMASK;
             if (address > 0) {
                 m_rawMemory.writeLong(address, p_offset, p_value);
             } else {
@@ -1402,12 +1404,20 @@ public final class MemoryManagerComponent {//<<
         //->return true;
     //->}
 
+    public boolean initComponent(){//<<
+        initMemory();
+
+        return true;
+
+    }
+
     //->@Override
     //->protected boolean shutdownComponent() {
-        //->shutdownMemory();
+    public boolean shutdownComponent() {//<<
+        shutdownMemory();
 
-        //->return true;
-    //->}
+        return true;
+    }
 
     /**
      * Initialize the memory manager
