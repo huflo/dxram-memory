@@ -321,6 +321,60 @@ public final class CIDTable {
     }
 
     /**
+     * Get the table address and the index of a CID
+     *
+     * @param p_chunkID the CID we want to know the memory address
+     * @return a long array with the table address and the index of the entry or null if there is no suitable CID entry
+     */
+    long[] getAddressOfEntry(long p_chunkID){
+        long index;
+        long entry;
+
+        int level = 0;
+        long addressTable;
+        boolean putCache = false;
+
+        // try to jump to table level 0 using the cache
+        addressTable = m_cache[(int) Thread.currentThread().getId()].getTableLevel0(p_chunkID);
+        if (addressTable == -1) {
+            level = LID_TABLE_LEVELS;
+            addressTable = m_addressTableDirectory;
+            putCache = true;
+        }
+
+        do {
+            if (level == LID_TABLE_LEVELS) {
+                index = p_chunkID >> BITS_PER_LID_LEVEL * level & NID_LEVEL_BITMASK;
+            } else {
+                index = p_chunkID >> BITS_PER_LID_LEVEL * level & LID_LEVEL_BITMASK;
+            }
+
+            if (level > 0) {
+                entry = readAddress(addressTable, index);
+
+                if (entry <= 0) {
+                    break;
+                }
+
+                // move on to next table
+                addressTable = entry;
+            } else {
+                // add table 0 address to cache
+                if (putCache) {
+                    m_cache[(int) Thread.currentThread().getId()].putTableLevel0(p_chunkID, addressTable);
+                }
+
+                // get address of the entry
+                return new long[]{addressTable, index};
+            }
+
+            level--;
+        } while (level >= 0);
+
+        return null;
+    }
+
+    /**
      * Sets an entry of the level 0 table
      *
      * @param p_chunkID
@@ -476,6 +530,31 @@ public final class CIDTable {
         }
 
         System.out.println(infos);
+    }
+
+    /**
+     * Debugging: Get a formatted string from a level 0 entry
+     *
+     * @param p_chunkID the CID of the entry
+     * @return a formatted string
+     */
+    public String cidEntry(long p_chunkID){
+        long entry = get(p_chunkID);
+        if(entry == 0){
+            return String.format("UnknownCID: 0x%016X", p_chunkID);
+        }
+
+        return String.format("CID(0x%X): address: 0x%X, lf: %d, embedded lf: %b read: %d, write: %b, moveable: %b, removeable: %b, full: %b ",
+                p_chunkID,
+                (entry & ADDRESS.BITMASK) >> ADDRESS.OFFSET,
+                (entry & LENGTH_FIELD.BITMASK) >> LENGTH_FIELD.OFFSET,
+                (entry & EMBEDDED_LENGTH_FIELD.BITMASK) != 0,
+                (entry & READ_ACCESS.BITMASK) >> READ_ACCESS.OFFSET,
+                (entry & WRITE_ACCESS.BITMASK) != 0,
+                (entry & STATE_NOT_MOVEABLE.BITMASK) == 0,
+                (entry & STATE_NOT_REMOVEABLE.BITMASK) == 0,
+                (entry & FULL_FLAG) != 0);
+
     }
 
     /**
