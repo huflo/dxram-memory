@@ -59,7 +59,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * @author Florian Klein, florian.klein@hhu.de, 13.02.2014
  * @author Stefan Nothaas, stefan.nothaas@hhu.de, 11.11.2015
- * @author Florian Hucke, florian.hucke@hhu.de, 02.09.2018
+ * @author Florian Hucke, florian.hucke@hhu.de, 09.02.2018
  */
 //->public final class MemoryManagerComponent extends AbstractDXRAMComponent<MemoryManagerComponentConfig> {
 public final class MemoryManagerComponent {//<<
@@ -234,7 +234,7 @@ public final class MemoryManagerComponent {//<<
             }
 
             address = m_rawMemory.malloc(p_size);
-            if (address >= 0) {
+            if (address > SmallObjectHeap.INVALID_ADDRESS) {
                 //->chunkID = (long) m_boot.getNodeID() << 48;
                 chunkID = (long) NODE_ID << 48; //<<
 
@@ -293,7 +293,7 @@ public final class MemoryManagerComponent {//<<
             // verify this id is not used
             if (m_cidTable.get(p_chunkId) == 0) {
                 address = m_rawMemory.malloc(p_size);
-                if (address >= 0) {
+                if (address > SmallObjectHeap.INVALID_ADDRESS) {
                     // register new chunk
                     // register new chunk in cid table
                     if (!m_cidTable.set(chunkID, address)) {
