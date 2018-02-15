@@ -1,17 +1,20 @@
 package de.hhu.bsinfo;
 
-import de.hhu.bsinfo.dxram.mem.MemoryControl;
+import de.hhu.bsinfo.dxram.mem.Testing;
 
 public class DXRAMMemory{
 
-    public static void main(String[] args){
-        long heapSize = 1024*1024*1024; //1GB
-        short nodeID = 0;
+    public static void main(String[] args) throws InterruptedException {
+        Testing t;
+        for (int i = 0; i < 1; i++) {
 
-        MemoryControl memoryControl = new MemoryControl(nodeID, heapSize);
+            t = new Testing();
 
-        memoryControl.addressSizeTest();
+            //t.lockFor(100);
 
-        memoryControl.destroy();
+            t.lockThreads(100000, 0.1);
+
+            t.destroy();
+        }
     }
 }
