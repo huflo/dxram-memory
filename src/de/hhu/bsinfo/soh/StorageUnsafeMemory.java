@@ -230,7 +230,7 @@ public class StorageUnsafeMemory implements Storage {
         return UnsafeMemory.compareAndSwapInt(m_memoryBase + p_ptr, p_expected_value, p_new_value);
     }
 
-    public boolean compareAndSwapLong(final long p_ptr, int p_expected_value, int p_new_value){
+    public boolean compareAndSwapLong(final long p_ptr, long p_expected_value, long p_new_value){
         return UnsafeMemory.compareAndSwapLong(m_memoryBase + p_ptr, p_expected_value, p_new_value);
     }
 }

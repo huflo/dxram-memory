@@ -1559,6 +1559,43 @@ public final class SmallObjectHeap implements Importable, Exportable {
         m_memory.writeVal(p_address, p_bytes, p_count);
     }
 
+    /**
+     * Do a compare and swap operation on a integer value
+     *
+     * @param p_address
+     *          address of the integer
+
+     * @param p_expectedValue
+     *          the value which is expected
+     * @param p_newValue
+     *          the new integer value
+     * @return
+     *          is the value replaced?
+     */
+    boolean compareAndSwapInt(final long p_address, final long p_offset, final int p_expectedValue, final int p_newValue){
+        int lfs = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        return m_memory.compareAndSwapInt(p_address + lfs + p_offset, p_expectedValue, p_newValue);
+    }
+
+    /**
+     * Do a compare and swap operation on a long value
+     *
+     * @param p_address
+     *          address of the long
+     * @param p_offset
+     *          offset of the element
+     * @param p_expectedData
+     *          the data which is expected
+     * @param p_newData
+     *          the new long data
+     * @return
+     *          is the data replaced?
+     */
+    boolean compareAndSwapLong(final long p_address, final long p_offset, final long p_expectedData, final long p_newData){
+        int lfs = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        return m_memory.compareAndSwapLong(p_address + lfs + p_offset, p_expectedData, p_newData);
+    }
+
     // --------------------------------------------------------------------------------------
 
     // Classes
