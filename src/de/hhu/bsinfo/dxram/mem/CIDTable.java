@@ -32,36 +32,36 @@ import org.apache.logging.log4j.Logger;
  */
 public final class CIDTable {
     private static final byte ENTRY_SIZE = 8;
-    private static BitMask bitMask = new BitMask(ENTRY_SIZE);
-
     static final byte LID_TABLE_LEVELS = 4;
 
     //43 Bit: the address size of a chunk
-    private static final long BITMASK_ADDRESS = bitMask.checkedCreate(43,0);
-
-    // 1 Bit: no remove allowed (e.g. to purpose a fast path)
-    private static final long BITMASK_NOT_REMOVEABLE = bitMask.checkedCreate(1, 43);
-
-    // 1 Bit: no move allowed (e.g. to purpose defragmentation)
-    private static final long BITMASK_NOT_MOVEABLE = bitMask.checkedCreate(1, 44);
+    static final Entry ADDRESS = new Entry(43);
 
     //10 Bit: as external length field
-    private static final long BITMASK_CHUNK_SIZE = bitMask.checkedCreate(10, 45);
+    static final Entry LENGTH_FIELD = new Entry(10);
 
     // 1 Bit: Object length field is bigger than 2^10 (the chunk has a additional length field)
-    private static final long BITMASK_EMBEDDED_LENGTH_FIELD = bitMask.checkedCreate(1,55);
+    static final Entry EMBEDDED_LENGTH_FIELD = new Entry(1);
 
     // 7 Bit: Count the parallel read access
-    private static final long BITMASK_READ = bitMask.checkedCreate(7, 56);
+    static final Entry READ_ACCESS = new Entry(7);
+    static final long READ_INCREMENT = 1L << READ_ACCESS.OFFSET;
 
     // 1 Bit: Mark a wanted write access
-    private static final long BITMASK_WRITE = bitMask.checkedCreate(1, 63);
+    static final Entry WRITE_ACCESS = new Entry(1);
+
+
+    // 1 Bit: no remove allowed (e.g. to purpose a fast path)
+    static final Entry STATE_NOT_REMOVEABLE = new Entry(1);
+
+    // 1 Bit: no move allowed (e.g. to purpose defragmentation)
+    static final Entry STATE_NOT_MOVEABLE = new Entry(1);
 
     //not moveable implies not removeable so we can use this combination for a full list or a unused cid
-    private static final long FULL_FLAG = BITMASK_NOT_MOVEABLE | BITMASK_NOT_REMOVEABLE;
+    private static final long FULL_FLAG = STATE_NOT_MOVEABLE.BITMASK | STATE_NOT_REMOVEABLE.BITMASK;
 
     private static final long FREE_ENTRY = 0;
-    private static final long ZOMBIE_ENTRY = bitMask.create(64, 0);
+    private static final long ZOMBIE_ENTRY = BitMask.createMask(64, 0);
     private static final Logger LOGGER = LogManager.getFormatterLogger(CIDTable.class.getSimpleName());
     // statistics recorder
     //private static final StatisticsOperation SOP_CREATE_NID_TABLE = StatisticsRecorderManager.getOperation(MemoryManagerComponent.class, "CreateNIDTable");
@@ -206,10 +206,10 @@ public final class CIDTable {
 
         ret = new ArrayListLong();
         for (int i = 0; i < ENTRIES_FOR_NID_LEVEL; i++) {
-            entry = readEntry(m_addressTableDirectory, i) & BITMASK_ADDRESS;
+            entry = readEntry(m_addressTableDirectory, i) & ADDRESS.BITMASK;
             if (entry > 0) {
                 if (i == (m_ownNodeID & 0xFFFF)) {
-                    getAllRanges(ret, (long) i << 48, readEntry(m_addressTableDirectory, i & NID_LEVEL_BITMASK) & BITMASK_ADDRESS, LID_TABLE_LEVELS - 1);
+                    getAllRanges(ret, (long) i << 48, readEntry(m_addressTableDirectory, i & NID_LEVEL_BITMASK) & ADDRESS.BITMASK, LID_TABLE_LEVELS - 1);
                 }
             }
         }
@@ -228,9 +228,9 @@ public final class CIDTable {
 
         ret = new ArrayListLong();
         for (int i = 0; i < ENTRIES_FOR_NID_LEVEL; i++) {
-            entry = readEntry(m_addressTableDirectory, i) & BITMASK_ADDRESS;
+            entry = readEntry(m_addressTableDirectory, i) & ADDRESS.BITMASK;
             if (entry > 0 && i != (m_ownNodeID & 0xFFFF)) {
-                getAllRanges(ret, (long) i << 48, readEntry(m_addressTableDirectory, i & NID_LEVEL_BITMASK) & BITMASK_ADDRESS, LID_TABLE_LEVELS - 1);
+                getAllRanges(ret, (long) i << 48, readEntry(m_addressTableDirectory, i & NID_LEVEL_BITMASK) & ADDRESS.BITMASK, LID_TABLE_LEVELS - 1);
             }
         }
 
@@ -296,14 +296,14 @@ public final class CIDTable {
             }
 
             if (level > 0) {
-                entry = readEntry(addressTable, index) & BITMASK_ADDRESS;
+                entry = readEntry(addressTable, index) & ADDRESS.BITMASK;
 
                 if (entry <= 0) {
                     break;
                 }
 
                 // move on to next table
-                addressTable = entry & BITMASK_ADDRESS;
+                addressTable = entry & ADDRESS.BITMASK;
             } else {
                 // add table 0 address to cache
                 if (putCache) {
@@ -364,11 +364,11 @@ public final class CIDTable {
                 }
 
                 // move on to next table
-                addressTable = entry & BITMASK_ADDRESS;
+                addressTable = entry & ADDRESS.BITMASK;
             } else {
                 // Set the level 0 entry (address to active chunk)
                 // valid and active entry, delete flag 0
-                writeEntry(addressTable, index, p_addressChunk & BITMASK_ADDRESS);
+                writeEntry(addressTable, index, p_addressChunk & ADDRESS.BITMASK);
 
                 // add table address to table 0 to cache
                 if (putCache) {
@@ -424,14 +424,14 @@ public final class CIDTable {
                     writeEntry(addressTable, index, entry);
                 }
 
-                if ((entry & BITMASK_ADDRESS) == 0) {
+                if ((entry & ADDRESS.BITMASK) == 0) {
                     break;
                 }
 
                 // Delete entry in the following table
-                addressTable = entry & BITMASK_ADDRESS;
+                addressTable = entry & ADDRESS.BITMASK;
             } else {
-                ret = readEntry(addressTable, index) & BITMASK_ADDRESS;
+                ret = readEntry(addressTable, index) & ADDRESS.BITMASK;
 
                 // already deleted
                 if (ret == FREE_ENTRY || ret == ZOMBIE_ENTRY) {
@@ -621,7 +621,7 @@ public final class CIDTable {
             if (entry > 0) {
 
                 if (p_level > 0) {
-                    getAllRanges(p_ret, p_unfinishedCID + (i << BITS_PER_LID_LEVEL * p_level), entry & BITMASK_ADDRESS, p_level - 1);
+                    getAllRanges(p_ret, p_unfinishedCID + (i << BITS_PER_LID_LEVEL * p_level), entry & ADDRESS.BITMASK, p_level - 1);
                 } else {
                     if (entry != ZOMBIE_ENTRY) {
                         long curCID = p_unfinishedCID + i;
@@ -665,7 +665,7 @@ public final class CIDTable {
             entry = readEntry(p_table, i);
             if (entry > 0) {
                 if (p_level > 0) {
-                    ret.addAll(getAllEntries(p_unfinishedCID + (i << BITS_PER_LID_LEVEL * p_level), entry & BITMASK_ADDRESS, p_level - 1));
+                    ret.addAll(getAllEntries(p_unfinishedCID + (i << BITS_PER_LID_LEVEL * p_level), entry & ADDRESS.BITMASK, p_level - 1));
                 } else {
                     ret.add(p_unfinishedCID + i);
                 }
@@ -692,7 +692,7 @@ public final class CIDTable {
 
         if (p_level == LID_TABLE_LEVELS) {
             for (int i = 0; i < ENTRIES_FOR_NID_LEVEL; i++) {
-                entry = readEntry(p_addressTable, i) & BITMASK_ADDRESS;
+                entry = readEntry(p_addressTable, i) & ADDRESS.BITMASK;
 
                 if (entry > 0) {
                     countTables(entry, p_level - 1, p_count);
@@ -700,7 +700,7 @@ public final class CIDTable {
             }
         } else {
             for (int i = 0; i < ENTRIES_PER_LID_LEVEL; i++) {
-                entry = readEntry(p_addressTable, i) & BITMASK_ADDRESS;
+                entry = readEntry(p_addressTable, i) & ADDRESS.BITMASK;
 
                 if (entry > 0) {
                     if (p_level > 1) {
@@ -857,7 +857,7 @@ public final class CIDTable {
          * Finds free LIDs in the CIDTable
          */
         private void findFreeLIDs() {
-            findFreeLIDs(readEntry(m_addressTableDirectory, m_ownNodeID & NID_LEVEL_BITMASK) & BITMASK_ADDRESS, LID_TABLE_LEVELS - 1, 0);
+            findFreeLIDs(readEntry(m_addressTableDirectory, m_ownNodeID & NID_LEVEL_BITMASK) & ADDRESS.BITMASK, LID_TABLE_LEVELS - 1, 0);
         }
 
         /**
@@ -883,7 +883,7 @@ public final class CIDTable {
                 if (p_level > 0) {
                     if (entry > 0) {
                         // Get free LocalID in the next table
-                        if (!findFreeLIDs(entry & BITMASK_ADDRESS, p_level - 1, i << BITS_PER_LID_LEVEL * p_level)) {
+                        if (!findFreeLIDs(entry & ADDRESS.BITMASK, p_level - 1, i << BITS_PER_LID_LEVEL * p_level)) {
                             // Mark the table as full
                             entry |= FULL_FLAG;
                             writeEntry(p_addressTable, i, entry);
@@ -991,6 +991,21 @@ public final class CIDTable {
                     break;
                 }
             }
+        }
+    }
+
+    /**
+     * Handle bit masks and data offset for level 0 entries
+     */
+    static final class Entry {
+        private static BitMask bm = new BitMask(Long.SIZE);
+
+        long BITMASK;
+        byte OFFSET;
+
+        private Entry(long usedBits){
+            OFFSET = bm.getUsedBits();
+            BITMASK = bm.checkedCreate(usedBits);
         }
     }
 }
