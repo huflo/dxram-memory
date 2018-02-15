@@ -600,7 +600,6 @@ public final class CIDTable {
      * @return the entry
      */
     long readEntry(final long p_addressTable, final long p_index) {
-        //TODO Handle read access on list
         return m_rawMemory.readLong(p_addressTable, ENTRY_SIZE * p_index); //& 0xFFFFFFFFFFL;
     }
 
@@ -615,15 +614,173 @@ public final class CIDTable {
      *     the entry
      */
     void writeEntry(final long p_addressTable, final long p_index, final long p_entry) {
-        //TODO Handle write access on list
-
-        //long value;
-
-        //value = m_rawMemory.readLong(p_addressTable, ENTRY_SIZE * p_index) & 0xFFFFFF0000000000L;
-        //value += p_entry & 0xFFFFFFFFFFL;
-
-        //m_rawMemory.writeLong(p_addressTable, ENTRY_SIZE * p_index, value);
         m_rawMemory.writeLong(p_addressTable, ENTRY_SIZE * p_index, p_entry);
+    }
+
+    /**
+     * Get a read lock on a CID
+     *
+     * @param p_chunkID the cid we want to lock
+     * @return true if the CID exist else false
+     */
+    final boolean readLock(final long p_chunkID){
+        long[] entry;
+
+        if((entry = getAddressOfEntry(p_chunkID)) == null)
+            return false;
+
+        readLock(entry[0], entry[1]);
+
+        //System.out.println("got a read lock " + cidEntry(p_chunkID));
+
+        return true;
+    }
+
+    /**
+     * Get a read lock on a index in a table
+     *
+     * @param p_tableAddress address of the level 0 table
+     * @param p_index row in the table
+     */
+    final void readLock(final long p_tableAddress, final long p_index){
+        long m_offset = p_index * ENTRY_SIZE;
+        long value;
+
+        while(true) {
+            value = m_rawMemory.readLong(p_tableAddress, m_offset);
+
+            if ((value & READ_ACCESS.BITMASK) == READ_ACCESS.BITMASK ||
+                    (value & WRITE_ACCESS.BITMASK) == WRITE_ACCESS.BITMASK)
+                continue;
+
+            if (m_rawMemory.compareAndSwapLong(p_tableAddress, m_offset, value, value + READ_INCREMENT))
+                break;
+        }
+    }
+
+    /**
+     * Release a read lock on a CID
+     *
+     * @param p_chunkID the ID of the chunk
+     * @return true if the CID exist else false
+     */
+    final boolean readUnlock(final long p_chunkID){
+        long[] entry;
+
+        if((entry = getAddressOfEntry(p_chunkID)) ==  null)
+            return false;
+
+        readUnlock(entry[0], entry[1]);
+        //System.out.println("read unlock: " + cidEntry(p_chunkID));
+
+        return true;
+    }
+
+    /**
+     * Release a read lock on a index in a table
+     *
+     * @param p_tableAddress address of the level 0 table
+     * @param p_index row in the table
+     */
+    final void readUnlock(final long p_tableAddress, final long p_index){
+        long m_offset = p_index * ENTRY_SIZE;
+        long value;
+
+        while(true){
+            value = m_rawMemory.readLong(p_tableAddress, m_offset);
+
+            if((value & READ_ACCESS.BITMASK) == 0)
+                return;
+
+            if(m_rawMemory.compareAndSwapLong(p_tableAddress, m_offset, value, value - READ_INCREMENT))
+                break;
+
+        }
+    }
+
+    /**
+     * Get a write lock on a CID
+     *
+     * @param p_chunkID the cid we want to lock
+     * @return true if the CID exist else false
+     */
+    final boolean writeLock(final long p_chunkID){
+
+        long[] entry;
+        if((entry = getAddressOfEntry(p_chunkID)) == null)
+            return false;
+
+        writeLock(entry[0], entry[1]);
+        //System.out.println("write lock: " + cidEntry(p_chunkID));
+
+
+        return true;
+    }
+
+    /**
+     * Get a write lock on a index in a table
+     *
+     * @param p_tableAddress address of the level 0 table
+     * @param p_index row in the table
+     */
+    final void writeLock(final long p_tableAddress, final long p_index){
+        long m_offset = p_index * ENTRY_SIZE;
+        long value;
+
+        while(true){
+            value = m_rawMemory.readLong(p_tableAddress, m_offset);
+
+            if((value & WRITE_ACCESS.BITMASK) == WRITE_ACCESS.BITMASK)
+                continue;
+
+            if(m_rawMemory.compareAndSwapLong(p_tableAddress, m_offset, value, value | WRITE_ACCESS.BITMASK))
+                break;
+
+        }
+
+        // wait until no present read access
+        while((m_rawMemory.readLong(p_tableAddress, m_offset) & READ_ACCESS.BITMASK) != 0){ }
+    }
+
+
+    /**
+     * Release a read lock on a CID
+     *
+     * @param p_chunkID the ID of the chunk
+     * @return true if the CID exist else false
+     */
+    final boolean writeUnlock(final long p_chunkID){
+
+        long[] entry;
+        if((entry = getAddressOfEntry(p_chunkID)) == null)
+            return false;
+
+        writeUnlock(entry[0], entry[1]);
+        //System.out.println("write unlock: " + cidEntry(p_chunkID));
+
+
+        return true;
+    }
+
+    /**
+     * Release a write lock on a index in a table
+     *
+     * @param p_tableAddress address of the level 0 table
+     * @param p_index row in the table
+     */
+    final void writeUnlock(final long p_tableAddress, final long p_index){
+        long m_offset = p_index * ENTRY_SIZE;
+        long value;
+
+        // delete write access flag
+        while(true){
+            value = m_rawMemory.readLong(p_tableAddress, m_offset);
+            if((value & WRITE_ACCESS.BITMASK) == 0)
+                return;
+
+            if(m_rawMemory.compareAndSwapLong(p_tableAddress, m_offset, value, value & ~WRITE_ACCESS.BITMASK))
+                break;
+        }
     }
 
     /**

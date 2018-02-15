@@ -1534,6 +1534,26 @@ public final class MemoryManagerComponent {//<<
         }
     }
 
+    public void printTableEntry(String p_context, long p_chunkID){
+        System.out.println(p_context + ": " + m_cidTable.cidEntry(p_chunkID));
+    }
+
+    void readLock(final long p_chunkID){
+        m_cidTable.readLock(p_chunkID);
+    }
+
+    void readUnlock(final long p_chunkID){
+        m_cidTable.readUnlock(p_chunkID);
+    }
+
+    void writeLock(final long p_chunkID){
+        m_cidTable.writeLock(p_chunkID);
+    }
+
+    void writeUnlock(final long p_chunkID){
+        m_cidTable.writeUnlock(p_chunkID);
+    }
+
     /**
      * Status object for the memory component containing various information
      * about it.
