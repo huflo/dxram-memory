@@ -20,6 +20,8 @@ import de.hhu.bsinfo.utils.BitMask;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import static de.hhu.bsinfo.dxram.mem.CIDTableConfig.*;
+
 //import de.hhu.bsinfo.utils.stats.StatisticsOperation;
 //import de.hhu.bsinfo.utils.stats.StatisticsRecorderManager;
 
@@ -33,32 +35,6 @@ import org.apache.logging.log4j.Logger;
 public final class CIDTable {
     private static final byte ENTRY_SIZE = 8;
     static final byte LID_TABLE_LEVELS = 4;
-
-    //43 Bit: the address size of a chunk
-    static final Entry ADDRESS = new Entry(43);
-
-    //10 Bit: as external length field
-    static final Entry LENGTH_FIELD = new Entry(10);
-
-    // 1 Bit: Object length field is bigger than 2^10 (the chunk has a additional length field)
-    static final Entry EMBEDDED_LENGTH_FIELD = new Entry(1);
-
-    // 7 Bit: Count the parallel read access
-    static final Entry READ_ACCESS = new Entry(7);
-    static final long READ_INCREMENT = 1L << READ_ACCESS.OFFSET;
-
-    // 1 Bit: Mark a wanted write access
-    static final Entry WRITE_ACCESS = new Entry(1);
-
-
-    // 1 Bit: no remove allowed (e.g. to purpose a fast path)
-    static final Entry STATE_NOT_REMOVEABLE = new Entry(1);
-
-    // 1 Bit: no move allowed (e.g. to purpose defragmentation)
-    static final Entry STATE_NOT_MOVEABLE = new Entry(1);
-
-    //not moveable implies not removeable so we can use this combination for a full list or a unused cid
-    private static final long FULL_FLAG = STATE_NOT_MOVEABLE.BITMASK | STATE_NOT_REMOVEABLE.BITMASK;
 
     private static final long FREE_ENTRY = 0;
     private static final long ZOMBIE_ENTRY = BitMask.createMask(64, 0);
@@ -1241,18 +1217,4 @@ public final class CIDTable {
         }
     }
 
-    /**
-     * Handle bit masks and data offset for level 0 entries
-     */
-    static final class Entry {
-        private static BitMask bm = new BitMask(Long.SIZE);
-
-        long BITMASK;
-        byte OFFSET;
-
-        private Entry(long usedBits){
-            OFFSET = bm.getUsedBits();
-            BITMASK = bm.checkedCreate(usedBits);
-        }
-    }
 }

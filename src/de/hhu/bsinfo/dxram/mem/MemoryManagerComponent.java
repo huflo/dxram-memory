@@ -1202,7 +1202,7 @@ public final class MemoryManagerComponent {//<<
     public long readLong(final long p_chunkID, final int p_offset) {
 
         try {
-            long address = m_cidTable.get(p_chunkID) & CIDTable.ADDRESS.BITMASK;
+            long address = m_cidTable.get(p_chunkID) & CIDTableConfig.ADDRESS.BITMASK;
             if (address > 0) {
                 return m_rawMemory.readLong(address, p_offset);
             } else {
@@ -1313,7 +1313,7 @@ public final class MemoryManagerComponent {//<<
     public boolean writeLong(final long p_chunkID, final int p_offset, final long p_value) {
 
         try {
-            long address = m_cidTable.get(p_chunkID) & CIDTable.ADDRESS.BITMASK;
+            long address = m_cidTable.get(p_chunkID) & CIDTableConfig.ADDRESS.BITMASK;
             if (address > 0) {
                 m_rawMemory.writeLong(address, p_offset, p_value);
             } else {
