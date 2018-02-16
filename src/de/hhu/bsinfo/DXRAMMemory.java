@@ -10,9 +10,7 @@ public class DXRAMMemory{
 
             t = new Testing();
 
-            //t.lockFor(100);
-
-            t.lockThreads(100000, 0.1);
+            t.lockMultiThreadMultiChunk(4000000, 50, 16, 1000, 0.1);
 
             t.destroy();
         }
