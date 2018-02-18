@@ -50,8 +50,24 @@ public class CIDTableConfig {
             SIZE = usedBits;
         }
 
+        /**
+         * Create a bit partition for a level 0 entry
+         *
+         * @param usedBits number of bits the entry need
+         * @return a Entry Object
+         */
         static Entry create(int usedBits){
             return new Entry((byte)usedBits);
+        }
+
+        /**
+         * Get the saved data from a entry
+         *
+         * @param p_tableEntry the level 0 table entry
+         * @return the saved data
+         */
+        long get(long p_tableEntry){
+            return (p_tableEntry & BITMASK) >> OFFSET;
         }
     }
 }
