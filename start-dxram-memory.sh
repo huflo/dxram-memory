@@ -28,5 +28,6 @@ java \
     -Dlog4j.configurationFile=$CONF_DIR/log4j.xml \
     -Ddxram.config=$CONF_DIR/dxram.json \
     -cp $CLASSPATH $MAIN_CLASS \
+    -ea \
     -jar $BINARY #> /dev/null 2>&1
 
