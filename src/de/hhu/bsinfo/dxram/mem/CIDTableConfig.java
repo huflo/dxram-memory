@@ -21,7 +21,6 @@ public class CIDTableConfig {
     // 1 Bit: Mark a wanted write access
     static final CIDTableConfig.Entry WRITE_ACCESS = CIDTableConfig.Entry.create(1);
 
-
     // 1 Bit: no remove allowed (e.g. to purpose a fast path)
     static final CIDTableConfig.Entry STATE_NOT_REMOVEABLE = CIDTableConfig.Entry.create(1);
 
@@ -34,12 +33,12 @@ public class CIDTableConfig {
     /**
      * Handle bit masks and data offset for level 0 entries
      */
-    static final class Entry {
+    public static final class Entry {
         private static BitMask bm = new BitMask(Long.SIZE);
 
-        long BITMASK;
-        byte OFFSET;
-        byte SIZE;
+        public long BITMASK;
+        public byte OFFSET;
+        public byte SIZE;
 
         private Entry(byte usedBits){
             OFFSET = bm.getUsedBits();
@@ -53,7 +52,7 @@ public class CIDTableConfig {
          * @param usedBits number of bits the entry need
          * @return a Entry Object
          */
-        static Entry create(int usedBits){
+        private static Entry create(int usedBits){
             return new Entry((byte)usedBits);
         }
 
@@ -63,7 +62,7 @@ public class CIDTableConfig {
          * @param p_tableEntry the level 0 table entry
          * @return the saved data
          */
-        long get(long p_tableEntry){
+        public long get(long p_tableEntry){
             return (p_tableEntry & BITMASK) >> OFFSET;
         }
     }
