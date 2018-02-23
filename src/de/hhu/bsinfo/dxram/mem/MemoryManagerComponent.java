@@ -1534,9 +1534,6 @@ public final class MemoryManagerComponent {//<<
         }
     }
 
-    public void printTableEntry(String p_context, long p_chunkID){
-        System.out.println(p_context + ": " + m_cidTable.cidEntry(p_chunkID));
-    }
 
     void readLock(final long p_chunkID){
         m_cidTable.readLock(p_chunkID);

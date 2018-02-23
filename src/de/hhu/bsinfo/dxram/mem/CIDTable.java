@@ -351,6 +351,52 @@ public final class CIDTable {
     }
 
     /**
+     * Create a normal level 0 entry
+     *
+     * @param p_address
+     *          Address on the heap
+     * @param p_size
+     *          Size of the chunk
+     * @return A generated normal entry for the CID Table
+     */
+    public static long createEntry(final long p_address, final long p_size){
+        return createEntry(p_address, p_size, S_NORMAL);
+    }
+
+    /**
+     * Create a level 0 entry
+     *
+     * @param p_addressChunk
+     *          Address on the heap
+     * @param p_size
+     *          Size of the chunk
+     * @param p_state
+     *          State of the Chunk use S_NORMAL, S_NOT_MOVEABLE or S_NOT_REMOVEABLE
+     * @return A generated entry for the CID Table
+     */
+    public static long createEntry(final long p_addressChunk, final long p_size, int p_state){
+        long entry = 0;
+
+        //write address
+        entry |= ((p_addressChunk << ADDRESS.OFFSET) & ADDRESS.BITMASK);
+
+        //length field
+        entry |= ((p_size-1) & (LENGTH_FIELD.BITMASK >> LENGTH_FIELD.OFFSET)) << LENGTH_FIELD.OFFSET;
+
+        //states: 0: normal, 1: no remove, 2: no move (implies remove)
+        if(0 <= p_state && p_state < 4){
+            if(p_state == S_NOT_REMOVE)
+                entry |= STATE_NOT_REMOVEABLE.BITMASK;
+            else if (p_state == S_NOT_MOVE)
+                entry |= STATE_NOT_MOVEABLE.BITMASK;
+        } else {
+            System.out.println(String.format("[ERROR]: invalid state %d, set state to normal", p_state));
+        }
+
+        return entry;
+    }
+
+    /**
      * Sets an entry of the level 0 table
      *
      * @param p_chunkID
@@ -509,31 +555,6 @@ public final class CIDTable {
     }
 
     /**
-     * Debugging: Get a formatted string from a level 0 entry
-     *
-     * @param p_chunkID the CID of the entry
-     * @return a formatted string
-     */
-    public String cidEntry(long p_chunkID){
-        long entry = get(p_chunkID);
-        if(entry == 0){
-            return String.format("UnknownCID: 0x%016X", p_chunkID);
-        }
-
-        return String.format("CID(0x%X): address: 0x%X, lf: %d, embedded lf: %b read: %d, write: %b, moveable: %b, removeable: %b, full: %b ",
-                p_chunkID,
-                (entry & ADDRESS.BITMASK) >> ADDRESS.OFFSET,
-                (entry & LENGTH_FIELD.BITMASK) >> LENGTH_FIELD.OFFSET,
-                (entry & EMBEDDED_LENGTH_FIELD.BITMASK) != 0,
-                (entry & READ_ACCESS.BITMASK) >> READ_ACCESS.OFFSET,
-                (entry & WRITE_ACCESS.BITMASK) != 0,
-                (entry & STATE_NOT_MOVEABLE.BITMASK) == 0,
-                (entry & STATE_NOT_REMOVEABLE.BITMASK) == 0,
-                (entry & FULL_FLAG) != 0);
-
-    }
-
-    /**
      * Disengages the CIDTable
      */
     void disengage() {
@@ -607,7 +628,7 @@ public final class CIDTable {
 
         readLock(entry[0], entry[1]);
 
-        //System.out.println("got a read lock " + cidEntry(p_chunkID));
+        //System.out.println("got a read lock " + level0Entry(p_chunkID));
 
         return true;
     }
@@ -647,7 +668,7 @@ public final class CIDTable {
             return false;
 
         readUnlock(entry[0], entry[1]);
-        //System.out.println("read unlock: " + cidEntry(p_chunkID));
+        //System.out.println("read unlock: " + level0Entry(p_chunkID));
 
         return true;
     }
@@ -687,7 +708,7 @@ public final class CIDTable {
             return false;
 
         writeLock(entry[0], entry[1]);
-        //System.out.println("write lock: " + cidEntry(p_chunkID));
+        //System.out.println("write lock: " + level0Entry(p_chunkID));
 
 
         return true;
@@ -732,8 +753,6 @@ public final class CIDTable {
             return false;
 
         writeUnlock(entry[0], entry[1]);
-        //System.out.println("write unlock: " + cidEntry(p_chunkID));
-
 
         return true;
     }
@@ -1215,6 +1234,43 @@ public final class CIDTable {
                 }
             }
         }
+    }
+
+    /**
+     * Debugging: Get a formatted string from a level 0 entry with CID
+     *
+     * @param p_chunkID
+     *          the chunk id of the entry
+     * @return
+     *          a String with detailed information about the chunk
+     */
+    public String level0Entry(long p_chunkID){
+        long entry = get(p_chunkID);
+        if(entry == 0){
+            return String.format("UnknownCID: 0x%016X", p_chunkID);
+        }
+
+        return String.format("CID(0x%X): %s", p_chunkID, entryData(entry));
+    }
+
+    /**
+     * Debugging: Get a formatted string from a level 0 entry
+     *
+     * @param p_entry
+     *          the entry data
+     * @return
+     *          a String with detailed information about the chunk
+     */
+    public static String entryData(final long p_entry){
+        return String.format("address: 0x%X, lf: %d, read: %d, write: %b, moveable: %b, removeable: %b, full: %b",
+                ADDRESS.get(p_entry),
+                LENGTH_FIELD.get(p_entry),
+                READ_ACCESS.get(p_entry),
+                (p_entry & WRITE_ACCESS.BITMASK) != 0,
+                (p_entry & STATE_NOT_MOVEABLE.BITMASK) == 0,
+                (p_entry & STATE_NOT_REMOVEABLE.BITMASK) == 0,
+                (p_entry & FULL_FLAG) != 0);
+
     }
 
 }
