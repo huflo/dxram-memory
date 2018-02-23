@@ -9,13 +9,10 @@ import de.hhu.bsinfo.utils.BitMask;
 public class CIDTableConfig {
 
     //43 Bit: the address size of a chunk
-    static final CIDTableConfig.Entry ADDRESS = CIDTableConfig.Entry.create(43);
+    static final CIDTableConfig.Entry ADDRESS = CIDTableConfig.Entry.create(44);
 
     //10 Bit: as external length field
     static final CIDTableConfig.Entry LENGTH_FIELD = CIDTableConfig.Entry.create(10);
-
-    // 1 Bit: Object length field is bigger than 2^10 (the chunk has a additional length field)
-    static final CIDTableConfig.Entry EMBEDDED_LENGTH_FIELD = CIDTableConfig.Entry.create(1);
 
     // 7 Bit: Count the parallel read access
     static final CIDTableConfig.Entry READ_ACCESS = CIDTableConfig.Entry.create(7);

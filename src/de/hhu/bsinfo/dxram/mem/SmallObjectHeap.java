@@ -40,7 +40,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
     static final int SIZE_MARKER_BYTE = 1;
     static final byte ALLOC_BLOCK_FLAGS_OFFSET = 0x5;
     private static final Logger LOGGER = LogManager.getFormatterLogger(SmallObjectHeap.class.getSimpleName());
-    private static final long MAX_SET_SIZE = (long) Math.pow(2, 43);
+    private static final long MAX_SET_SIZE = (long) Math.pow(2, CIDTableConfig.ADDRESS.SIZE);
     private static final byte SMALL_BLOCK_SIZE = 64;
     private static final byte SINGLE_BYTE_MARKER = 0xF;
     // Attributes, have them accessible by the package to enable walking and analyzing the heap
