@@ -40,6 +40,8 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static de.hhu.bsinfo.dxram.mem.CIDTableConfig.*;
+
 //->import de.hhu.bsinfo.dxram.DXRAMComponentOrder;
 //->import de.hhu.bsinfo.dxram.boot.AbstractBootComponent;
 //->import de.hhu.bsinfo.dxram.engine.AbstractDXRAMComponent;
@@ -87,8 +89,8 @@ public final class MemoryManagerComponent {//<<
     private SmallObjectHeapDataStructureImExporter[] m_imexporter = new SmallObjectHeapDataStructureImExporter[65536];
 
     private short NODE_ID = 0;//<<
-    private long MEMORY_SIZE = 1024*1024*1024;//1GB //<<
-    private int BLOCK_SIZE = 4*1024*1024;//4MB //<<
+    private long MEMORY_SIZE = (long)Math.pow(2, 30);//1GB //<<
+    private int BLOCK_SIZE = (int)Math.pow(2,24);//4MB //<<
     private String DUMP_FOLDER = ".";
 
     /**
@@ -217,7 +219,10 @@ public final class MemoryManagerComponent {//<<
     public long createIndex(final int p_size) {
         assert p_size > 0;
 
+        long entry;
         long address;
+        long size;
+
         long chunkID;
 
         // #if LOGGER == TRACE
@@ -227,9 +232,12 @@ public final class MemoryManagerComponent {//<<
         try {
             if (m_cidTable.get(0) != 0) {
                 // delete old entry
-                address = m_cidTable.delete(0, false);
-                m_rawMemory.free(address);
-                m_totalActiveChunkMemory -= m_rawMemory.getSizeBlock(address);
+                entry = m_cidTable.delete(0, false);
+                address = ADDRESS.get(entry);
+                size = LENGTH_FIELD.get(entry) + 1; //+1 because of the offset
+
+                m_rawMemory.free(address, size);
+                m_totalActiveChunkMemory -= m_rawMemory.getSizeBlock(address, size);
                 m_numActiveChunks--;
             }
 
@@ -240,10 +248,10 @@ public final class MemoryManagerComponent {//<<
 
 
                 // register new chunk in cid table
-                if (!m_cidTable.set(chunkID, address)) {
+                if (!m_cidTable.set(chunkID, CIDTable.createEntry(address, p_size))) {
                     // on demand allocation of new table failed
                     // free previously created chunk for data to avoid memory leak
-                    m_rawMemory.free(address);
+                    m_rawMemory.free(address, p_size);
                     throw new OutOfKeyValueStoreMemoryException(getStatus());
                 } else {
                     m_numActiveChunks++;
@@ -273,6 +281,7 @@ public final class MemoryManagerComponent {//<<
      *         Size of the chunk.
      * @return The chunk id if successful, -1 if another chunk with the same id already exists.
      */
+    //TODO Respect the STATES
     public long create(final long p_chunkId, final int p_size) {
         assert p_size > 0;
 
@@ -296,10 +305,10 @@ public final class MemoryManagerComponent {//<<
                 if (address > SmallObjectHeap.INVALID_ADDRESS) {
                     // register new chunk
                     // register new chunk in cid table
-                    if (!m_cidTable.set(chunkID, address)) {
+                    if (!m_cidTable.set(chunkID, CIDTable.createEntry(address, p_size))) {
                         // on demand allocation of new table failed
                         // free previously created chunk for data to avoid memory leak
-                        m_rawMemory.free(address);
+                        m_rawMemory.free(address, p_size);
                         throw new OutOfKeyValueStoreMemoryException(getStatus());
                     } else {
                         m_numActiveChunks++;
@@ -333,6 +342,7 @@ public final class MemoryManagerComponent {//<<
      *         List of sizes to create chunks for
      * @return List of chunk ids matching the order of the size list
      */
+    //TODO testing
     public long[] createMultiSizes(final int... p_sizes) {
         return createMultiSizes(false, p_sizes);
     }
@@ -346,6 +356,7 @@ public final class MemoryManagerComponent {//<<
      *         List of sizes to create chunks for
      * @return List of chunk ids matching the order of the size list
      */
+    //TODO testing
     public long[] createMultiSizes(final boolean p_consecutive, final int... p_sizes) {
         long[] addresses;
         long[] lids;
@@ -376,12 +387,12 @@ public final class MemoryManagerComponent {//<<
                     lids[i] = ((long) NODE_ID << 48) + lids[i];//<<
 
                     // register new chunk in cid table
-                    if (!m_cidTable.set(lids[i], addresses[i])) {
+                    if (!m_cidTable.set(lids[i], CIDTable.createEntry(addresses[i], p_sizes[i]))) {
 
                         for (int j = i; j >= 0; j--) {
                             // on demand allocation of new table failed
                             // free previously created chunk for data to avoid memory leak
-                            m_rawMemory.free(addresses[j]);
+                            m_rawMemory.free(addresses[j], p_sizes[j]);
                         }
 
                         throw new OutOfKeyValueStoreMemoryException(getStatus());
@@ -421,6 +432,7 @@ public final class MemoryManagerComponent {//<<
      * @param p_dataStructures
      *         List of data structures. Chunk ids are automatically assigned after creation
      */
+    //TODO testing
     public void createMulti(final DataStructure... p_dataStructures) {
         createMulti(false, p_dataStructures);
     }
@@ -433,6 +445,7 @@ public final class MemoryManagerComponent {//<<
      * @param p_dataStructures
      *         List of data structures. Chunk ids are automatically assigned after creation
      */
+    //TODO testing
     public void createMulti(final boolean p_consecutive, final DataStructure... p_dataStructures) {
         int[] sizes = new int[p_dataStructures.length];
 
@@ -456,6 +469,7 @@ public final class MemoryManagerComponent {//<<
      *         Number of chunks with the specified size
      * @return Chunk id list of the created chunks
      */
+    //TODO testing
     public long[] createMulti(final int p_size, final int p_count) {
         return createMulti(p_size, p_count, false);
     }
@@ -471,6 +485,7 @@ public final class MemoryManagerComponent {//<<
      *         True to enforce consecutive chunk ids
      * @return Chunk id list of the created chunks
      */
+    //TODO testing
     public long[] createMulti(final int p_size, final int p_count, final boolean p_consecutive) {
         long[] addresses;
         long[] lids;
@@ -502,12 +517,12 @@ public final class MemoryManagerComponent {//<<
                     lids[i] = ((long) NODE_ID << 48) + lids[i];//<<
 
                     // register new chunk in cid table
-                    if (!m_cidTable.set(lids[i], addresses[i])) {
+                    if (!m_cidTable.set(lids[i], CIDTable.createEntry(addresses[i], p_size))) {
 
                         for (int j = i; j >= 0; j--) {
                             // on demand allocation of new table failed
                             // free previously created chunk for data to avoid memory leak
-                            m_rawMemory.free(addresses[j]);
+                            m_rawMemory.free(addresses[j], p_size);
                         }
 
                         throw new OutOfKeyValueStoreMemoryException(getStatus());
@@ -576,14 +591,14 @@ public final class MemoryManagerComponent {//<<
             // #ifdef STATISTICS
             //->SOP_MALLOC.leave();
             // #endif /* STATISTICS */
-            if (address >= 0) {
+            if (address > SmallObjectHeap.INVALID_ADDRESS) {
                 //->chunkID = ((long) m_boot.getNodeID() << 48) + lid;
                 chunkID = ((long) NODE_ID << 48) + lid;//<<
                 // register new chunk in cid table
-                if (!m_cidTable.set(chunkID, address)) {
+                if (!m_cidTable.set(chunkID, entry)) {
                     // on demand allocation of new table failed
                     // free previously created chunk for data to avoid memory leak
-                    m_rawMemory.free(address);
+                    m_rawMemory.free(address, p_size);
 
                     throw new OutOfKeyValueStoreMemoryException(getStatus());
                 } else {
@@ -620,8 +635,12 @@ public final class MemoryManagerComponent {//<<
      *         Data structure to read specified by its ID.
      * @return True if getting the chunk payload was successful, false if no chunk with the ID specified exists.
      */
+    //TODO testing
     public boolean get(final DataStructure p_dataStructure) {
+        long entry;
         long address;
+        long size;
+        boolean deleted;
         boolean ret = true;
 
         // #if LOGGER == TRACE
@@ -637,12 +656,15 @@ public final class MemoryManagerComponent {//<<
                 //->SOP_GET.enter();
                 // #endif /* STATISTICS */
 
-                address = m_cidTable.get(p_dataStructure.getID());
-                if (address > 0) {
-                    assert m_rawMemory.getSizeBlock(address) == p_dataStructure.sizeofObject();
+                entry = m_cidTable.get(p_dataStructure.getID());
+                address = ADDRESS.get(entry);
+                size = LENGTH_FIELD.get(entry) + 1;
+                deleted = (entry & FULL_FLAG) == FULL_FLAG;
+                if (address > SmallObjectHeap.INVALID_ADDRESS && ! deleted) {
+                    assert m_rawMemory.getSizeBlock(address, size) == p_dataStructure.sizeofObject();
 
                     // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter importer = getImExporter(address);
+                    SmallObjectHeapDataStructureImExporter importer = getImExporter(address, size);
                     importer.importObject(p_dataStructure);
 
                     p_dataStructure.setState(ChunkState.OK);
@@ -675,9 +697,13 @@ public final class MemoryManagerComponent {//<<
      *         Read the chunk data of the specified ID
      * @return A byte array with payload if getting the chunk payload was successful, null if no chunk with the ID exists.
      */
+    //TODO testing
     public byte[] get(final long p_chunkID) {
         byte[] ret;
-        long address;
+        long entry;
+        long address = 0;
+        long size = 0;
+        boolean deleted;
 
         // #if LOGGER == TRACE
         LOGGER.trace("ENTER get p_chunkID 0x%X", p_chunkID);
@@ -691,13 +717,16 @@ public final class MemoryManagerComponent {//<<
                 //->SOP_GET.enter();
                 // #endif /* STATISTICS */
 
-                address = m_cidTable.get(p_chunkID);
-                if (address > 0) {
-                    int chunkSize = m_rawMemory.getSizeBlock(address);
+                entry = m_cidTable.get(p_chunkID);
+                address = ADDRESS.get(entry);
+                size = LENGTH_FIELD.get(entry) + 1;
+                deleted = (entry & FULL_FLAG) == FULL_FLAG;
+                if (address > SmallObjectHeap.INVALID_ADDRESS && ! deleted) {
+                    int chunkSize = m_rawMemory.getSizeBlock(address, size);
                     ret = new byte[chunkSize];
 
                     // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter importer = getImExporter(address);
+                    SmallObjectHeapDataStructureImExporter importer = getImExporter(address, size);
                     int retSize = importer.readBytes(ret);
                     if (retSize != chunkSize) {
                         //->throw new DXRAMRuntimeException("Unknown error, importer size " + retSize + " != chunk size " + chunkSize);
@@ -731,9 +760,13 @@ public final class MemoryManagerComponent {//<<
      *         Read the chunk data of the specified ID
      * @return the number of read bytes
      */
+    //TODO testing
     public int get(final long p_chunkID, final byte[] p_buffer, final int p_offset, final int p_bufferSize) {
         int ret;
+        long entry;
         long address;
+        long size;
+        boolean deleted;
 
         try {
             if (p_chunkID == ChunkID.INVALID_ID) {
@@ -744,15 +777,18 @@ public final class MemoryManagerComponent {//<<
             //->SOP_GET.enter();
             // #endif /* STATISTICS */
 
-            address = m_cidTable.get(p_chunkID);
-            if (address > 0) {
-                int chunkSize = m_rawMemory.getSizeBlock(address);
+            entry = m_cidTable.get(p_chunkID);
+            address = ADDRESS.get(entry);
+            size = LENGTH_FIELD.get(entry) + 1;
+            deleted = (entry & FULL_FLAG) == FULL_FLAG;
+            if (address > SmallObjectHeap.INVALID_ADDRESS && ! deleted) {
+                int chunkSize = m_rawMemory.getSizeBlock(address, size);
 
                 if (p_offset + chunkSize > p_bufferSize) {
                     ret = 0;
                 } else {
                     // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter importer = getImExporter(address);
+                    SmallObjectHeapDataStructureImExporter importer = getImExporter(address, size);
                     ret = importer.readBytes(p_buffer, p_offset, chunkSize);
                     if (ret != chunkSize) {
                         //->throw new DXRAMRuntimeException("Unknown error, importer size " + ret + " != chunk size " + chunkSize);
@@ -784,9 +820,13 @@ public final class MemoryManagerComponent {//<<
      *         Data structure to put
      * @return True if putting the data was successful, false if no chunk with the specified id exists
      */
+    //TODO testing
     public boolean put(final DataStructure p_dataStructure) {
-        long address;
         boolean ret = true;
+        long entry;
+        long address;
+        long size;
+        boolean deleted;
 
         // #if LOGGER == TRACE
         LOGGER.trace("ENTER put p_dataStructure 0x%X", p_dataStructure.getID());
@@ -801,12 +841,15 @@ public final class MemoryManagerComponent {//<<
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                address = m_cidTable.get(p_dataStructure.getID());
-                if (address > 0) {
-                    assert m_rawMemory.getSizeBlock(address) == p_dataStructure.sizeofObject();
+                entry = m_cidTable.get(p_dataStructure.getID());
+                address = ADDRESS.get(entry);
+                size = LENGTH_FIELD.get(entry) + 1;
+                deleted = (entry & FULL_FLAG) == FULL_FLAG;
+                if (address > SmallObjectHeap.INVALID_ADDRESS  && ! deleted) {
+                    assert m_rawMemory.getSizeBlock(address, size) == p_dataStructure.sizeofObject();
 
                     // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter exporter = getImExporter(address);
+                    SmallObjectHeapDataStructureImExporter exporter = getImExporter(address, size);
                     exporter.exportObject(p_dataStructure);
 
                     p_dataStructure.setState(ChunkState.OK);
@@ -843,6 +886,7 @@ public final class MemoryManagerComponent {//<<
      *         Chunk data to put
      * @return True if putting the data was successful, false if no chunk with the specified id exists
      */
+    //TODO testing
     public boolean put(final long p_chunkID, final byte[] p_data) {
         return put(p_chunkID, p_data, 0, p_data.length);
     }
@@ -863,8 +907,12 @@ public final class MemoryManagerComponent {//<<
      *         Number of bytes to put
      * @return True if putting the data was successful, false if no chunk with the specified id exists
      */
+    //TODO testing
     public boolean put(final long p_chunkID, final byte[] p_data, final int p_offset, final int p_length) {
+        long entry;
         long address;
+        long size;
+        boolean deleted;
         boolean ret = true;
 
         // #if LOGGER == TRACE
@@ -879,11 +927,14 @@ public final class MemoryManagerComponent {//<<
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                address = m_cidTable.get(p_chunkID);
-                if (address > 0) {
-                    assert p_offset + p_length <= m_rawMemory.getSizeBlock(address);
+                entry = m_cidTable.get(p_chunkID);
+                address = ADDRESS.get(entry);
+                size = LENGTH_FIELD.get(entry) + 1;
+                deleted = (entry & FULL_FLAG) == FULL_FLAG;
+                if (address > SmallObjectHeap.INVALID_ADDRESS && ! deleted) {
+                    assert p_offset + p_length <= m_rawMemory.getSizeBlock(address, size+1) : "offset: " + p_offset + "\tlength: " + p_length + "\tbs: " + m_rawMemory.getSizeBlock(address, size);
 
-                    m_rawMemory.writeBytes(address, 0, p_data, p_offset, p_length);
+                    m_rawMemory.writeBytes(address, 0, p_data, p_offset, p_length, size);
                 } else {
                     ret = false;
                 }
@@ -915,9 +966,13 @@ public final class MemoryManagerComponent {//<<
      *         if chunk was deleted during migration this flag should be set to true
      * @return The size of the deleted chunk if removing the data was successful, -1 if the chunk with the specified id does not exist
      */
+    //TODO testing
     public int remove(final long p_chunkID, final boolean p_wasMigrated) {
         int ret = -1;
-        long addressDeletedChunk;
+        long entry = 0;
+        long addressDeletedChunk = 0;
+        long size = 0;
+        boolean deleted = false;
 
         // #if LOGGER == TRACE
         LOGGER.trace("ENTER remove p_chunkID 0x%X, p_wasMigrated %d", p_chunkID, p_wasMigrated);
@@ -932,8 +987,12 @@ public final class MemoryManagerComponent {//<<
                 // #endif /* STATISTICS */
 
                 // Get and delete the address from the CIDTable, mark as zombie first
-                addressDeletedChunk = m_cidTable.delete(p_chunkID, true);
-                if (addressDeletedChunk > 0) {
+                entry = m_cidTable.delete(p_chunkID, true);
+                addressDeletedChunk = ADDRESS.get(entry);
+                size = LENGTH_FIELD.get(entry) + 1; //+1 because of the offset
+                deleted = (entry & FULL_FLAG) == FULL_FLAG;
+
+                if (addressDeletedChunk > SmallObjectHeap.INVALID_ADDRESS && !deleted) {
 
                     if (p_wasMigrated) {
                         // deleted and previously migrated chunks don't end up in the LID store
@@ -947,11 +1006,11 @@ public final class MemoryManagerComponent {//<<
                             // no space for zombie in LID store, keep him "alive" in table
                         }
                     }
-                    ret = m_rawMemory.getSizeBlock(addressDeletedChunk);
+                    ret = m_rawMemory.getSizeBlock(addressDeletedChunk, size);
                     // #ifdef STATISTICS
                     //->SOP_FREE.enter(ret);
                     // #endif /* STATISTICS */
-                    m_rawMemory.free(addressDeletedChunk);
+                    m_rawMemory.free(addressDeletedChunk, size);
                     // #ifdef STATISTICS
                     //->SOP_FREE.leave();
                     // #endif /* STATISTICS */
@@ -986,6 +1045,7 @@ public final class MemoryManagerComponent {//<<
      * @param p_usedEntries
      *         Specifies the actual number of slots used in the array (may be less than p_lengths)
      */
+    //TODO testing
     public void createAndPutRecovered(final long[] p_chunkIDs, final byte[] p_data, final int[] p_offsets, final int[] p_lengths, final int p_usedEntries) {
         long[] addresses;
 
@@ -1008,14 +1068,15 @@ public final class MemoryManagerComponent {//<<
             if (addresses != null) {
 
                 for (int i = 0; i < addresses.length; i++) {
-                    m_rawMemory.writeBytes(addresses[i], 0, p_data, p_offsets[i], p_lengths[i]);
+                    m_rawMemory.writeBytes(addresses[i], 0, p_data, p_offsets[i], p_lengths[i],
+                            (p_lengths[i]-1) & (LENGTH_FIELD.BITMASK >> LENGTH_FIELD.OFFSET));
                     m_totalActiveChunkMemory += p_lengths[i];
                 }
 
                 m_numActiveChunks += addresses.length;
 
                 for (int i = 0; i < addresses.length; i++) {
-                    m_cidTable.set(p_chunkIDs[i], addresses[i]);
+                    m_cidTable.set(p_chunkIDs[i], CIDTable.createEntry(addresses[i], p_lengths[i]));
                 }
             } else {
                 throw new OutOfKeyValueStoreMemoryException(getStatus());
@@ -1066,7 +1127,8 @@ public final class MemoryManagerComponent {//<<
             if (addresses != null) {
 
                 for (int i = 0; i < addresses.length; i++) {
-                    SmallObjectHeapDataStructureImExporter exporter = getImExporter(addresses[i]);
+                    SmallObjectHeapDataStructureImExporter exporter = getImExporter(addresses[i],
+                            sizes[i] & (LENGTH_FIELD.BITMASK >> LENGTH_FIELD.OFFSET));
                     exporter.exportObject(p_dataStructures[i]);
                     ret += sizes[i];
                     m_totalActiveChunkMemory += sizes[i];
@@ -1075,7 +1137,7 @@ public final class MemoryManagerComponent {//<<
                 m_numActiveChunks += addresses.length;
 
                 for (int i = 0; i < addresses.length; i++) {
-                    m_cidTable.set(p_dataStructures[i].getID(), addresses[i]);
+                    m_cidTable.set(p_dataStructures[i].getID(), CIDTable.createEntry(addresses[i], sizes[i]));
                 }
             } else {
                 throw new OutOfKeyValueStoreMemoryException(getStatus());
@@ -1129,9 +1191,12 @@ public final class MemoryManagerComponent {//<<
      */
     public byte readByte(final long p_chunkID, final int p_offset) {
         try {
-            long address = m_cidTable.get(p_chunkID);
-            if (address > 0) {
-                return m_rawMemory.readByte(address, p_offset);
+            long entry = m_cidTable.get(p_chunkID);
+            long address = ADDRESS.get(entry);
+            long size = LENGTH_FIELD.get(entry) + 1; //+1 because of the offset
+            boolean deleted = (entry & FULL_FLAG) == FULL_FLAG;
+            if (address > SmallObjectHeap.INVALID_ADDRESS && ! deleted) {
+                return m_rawMemory.readByte(address, p_offset, size);
             } else {
                 return -1;
             }
@@ -1153,9 +1218,12 @@ public final class MemoryManagerComponent {//<<
      */
     public short readShort(final long p_chunkID, final int p_offset) {
         try {
-            long address = m_cidTable.get(p_chunkID);
-            if (address > 0) {
-                return m_rawMemory.readShort(address, p_offset);
+            long entry = m_cidTable.get(p_chunkID);
+            long address = ADDRESS.get(entry);
+            long size = LENGTH_FIELD.get(entry) + 1; //+1 because of the offset
+            boolean deleted = (entry & FULL_FLAG) == FULL_FLAG;
+            if (address > SmallObjectHeap.INVALID_ADDRESS && ! deleted) {
+                return m_rawMemory.readShort(address, p_offset, size);
             } else {
                 return -1;
             }
@@ -1177,9 +1245,12 @@ public final class MemoryManagerComponent {//<<
      */
     public int readInt(final long p_chunkID, final int p_offset) {
         try {
-            long address = m_cidTable.get(p_chunkID);
-            if (address > 0) {
-                return m_rawMemory.readInt(address, p_offset);
+            long entry = m_cidTable.get(p_chunkID);
+            long address = ADDRESS.get(entry);
+            long size = LENGTH_FIELD.get(entry) + 1; //+1 because of the offset
+            boolean deleted = (entry & FULL_FLAG) == FULL_FLAG;
+            if (address > SmallObjectHeap.INVALID_ADDRESS && ! deleted) {
+                return m_rawMemory.readInt(address, p_offset, size);
             } else {
                 return -1;
             }
@@ -1202,9 +1273,12 @@ public final class MemoryManagerComponent {//<<
     public long readLong(final long p_chunkID, final int p_offset) {
 
         try {
-            long address = m_cidTable.get(p_chunkID) & CIDTableConfig.ADDRESS.BITMASK;
-            if (address > 0) {
-                return m_rawMemory.readLong(address, p_offset);
+            long entry = m_cidTable.get(p_chunkID);
+            long address = ADDRESS.get(entry);
+            long lengthField = LENGTH_FIELD.get(entry);
+            boolean deleted = (entry & FULL_FLAG) == FULL_FLAG;
+            if (address > SmallObjectHeap.INVALID_ADDRESS && ! deleted) {
+                return m_rawMemory.readLong(address, p_offset, lengthField);
             } else {
                 return -1;
             }
@@ -1228,9 +1302,12 @@ public final class MemoryManagerComponent {//<<
      */
     public boolean writeByte(final long p_chunkID, final int p_offset, final byte p_value) {
         try {
-            long address = m_cidTable.get(p_chunkID);
-            if (address > 0) {
-                m_rawMemory.writeByte(address, p_offset, p_value);
+            long entry = m_cidTable.get(p_chunkID);
+            long address = ADDRESS.get(entry);
+            long size = LENGTH_FIELD.get(entry) + 1; //+1 because of the offset
+            boolean deleted = (entry & FULL_FLAG) == FULL_FLAG;
+            if (address > SmallObjectHeap.INVALID_ADDRESS && ! deleted) {
+                m_rawMemory.writeByte(address, p_offset, p_value, size);
             } else {
                 return false;
             }
@@ -1256,9 +1333,12 @@ public final class MemoryManagerComponent {//<<
      */
     public boolean writeShort(final long p_chunkID, final int p_offset, final short p_value) {
         try {
-            long address = m_cidTable.get(p_chunkID);
-            if (address > 0) {
-                m_rawMemory.writeShort(address, p_offset, p_value);
+            long entry = m_cidTable.get(p_chunkID);
+            long address = ADDRESS.get(entry);
+            long size = LENGTH_FIELD.get(entry) + 1; //+1 because of the offset
+            boolean deleted = (entry & FULL_FLAG) == FULL_FLAG;
+            if (address > SmallObjectHeap.INVALID_ADDRESS && ! deleted) {
+                m_rawMemory.writeShort(address, p_offset, p_value, size);
             } else {
                 return false;
             }
@@ -1284,9 +1364,12 @@ public final class MemoryManagerComponent {//<<
      */
     public boolean writeInt(final long p_chunkID, final int p_offset, final int p_value) {
         try {
-            long address = m_cidTable.get(p_chunkID);
-            if (address > 0) {
-                m_rawMemory.writeInt(address, p_offset, p_value);
+            long entry = m_cidTable.get(p_chunkID);
+            long address = ADDRESS.get(entry);
+            long size = LENGTH_FIELD.get(entry) + 1; //+1 because of the offset
+            boolean deleted = (entry & FULL_FLAG) == FULL_FLAG;
+            if (address > SmallObjectHeap.INVALID_ADDRESS && ! deleted) {
+                m_rawMemory.writeInt(address, p_offset, p_value, size);
             } else {
                 return false;
             }
@@ -1311,11 +1394,13 @@ public final class MemoryManagerComponent {//<<
      * @return True if writing chunk was successful, false otherwise.
      */
     public boolean writeLong(final long p_chunkID, final int p_offset, final long p_value) {
-
         try {
-            long address = m_cidTable.get(p_chunkID) & CIDTableConfig.ADDRESS.BITMASK;
-            if (address > 0) {
-                m_rawMemory.writeLong(address, p_offset, p_value);
+            long entry = m_cidTable.get(p_chunkID);
+            long address = ADDRESS.get(entry);
+            long lengthField = LENGTH_FIELD.get(entry);
+            boolean deleted = (entry & FULL_FLAG) == FULL_FLAG;
+            if (address > SmallObjectHeap.INVALID_ADDRESS && ! deleted) {
+                m_rawMemory.writeLong(address, p_offset, p_value, lengthField);
             } else {
                 return false;
             }
@@ -1349,7 +1434,8 @@ public final class MemoryManagerComponent {//<<
         }
 
         // If address <= 0, the Chunk does not exists in memory
-        return address > 0;
+        return address > SmallObjectHeap.INVALID_ADDRESS &&
+                address < m_rawMemory.m_baseFreeBlockList-SmallObjectHeap.SIZE_MARKER_BYTE;
     }
 
     /**
@@ -1460,7 +1546,7 @@ public final class MemoryManagerComponent {//<<
      *         Start address of the chunk
      * @return Im/Exporter for the chunk
      */
-    private SmallObjectHeapDataStructureImExporter getImExporter(final long p_address) {
+    private SmallObjectHeapDataStructureImExporter getImExporter(final long p_address, final long p_extSize) {
         long tid = Thread.currentThread().getId();
         if (tid > 65536) {
             throw new RuntimeException("Exceeded max. thread id");
@@ -1469,10 +1555,11 @@ public final class MemoryManagerComponent {//<<
         // pool the im/exporters
         SmallObjectHeapDataStructureImExporter importer = m_imexporter[(int) tid];
         if (importer == null) {
-            m_imexporter[(int) tid] = new SmallObjectHeapDataStructureImExporter(m_rawMemory, p_address, 0);
+            m_imexporter[(int) tid] = new SmallObjectHeapDataStructureImExporter(m_rawMemory, p_address, 0, p_extSize);
             importer = m_imexporter[(int) tid];
         } else {
             importer.setAllocatedMemoryStartAddress(p_address);
+            importer.setExternalSize(p_extSize);
             importer.setOffset(0);
         }
 

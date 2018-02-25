@@ -182,10 +182,12 @@ public final class CIDTable {
 
         ret = new ArrayListLong();
         for (int i = 0; i < ENTRIES_FOR_NID_LEVEL; i++) {
-            entry = readEntry(m_addressTableDirectory, i) & ADDRESS.BITMASK;
+            entry = ADDRESS.get(readEntry(m_addressTableDirectory, i,NID_TABLE_SIZE));
             if (entry > 0) {
                 if (i == (m_ownNodeID & 0xFFFF)) {
-                    getAllRanges(ret, (long) i << 48, readEntry(m_addressTableDirectory, i & NID_LEVEL_BITMASK) & ADDRESS.BITMASK, LID_TABLE_LEVELS - 1);
+                    getAllRanges(ret, (long) i << 48,
+                            ADDRESS.get(readEntry(m_addressTableDirectory, i & NID_LEVEL_BITMASK, NID_TABLE_SIZE)),
+                            LID_TABLE_LEVELS - 1);
                 }
             }
         }
@@ -204,9 +206,11 @@ public final class CIDTable {
 
         ret = new ArrayListLong();
         for (int i = 0; i < ENTRIES_FOR_NID_LEVEL; i++) {
-            entry = readEntry(m_addressTableDirectory, i) & ADDRESS.BITMASK;
+            entry = ADDRESS.get(readEntry(m_addressTableDirectory, i, NID_TABLE_SIZE));
             if (entry > 0 && i != (m_ownNodeID & 0xFFFF)) {
-                getAllRanges(ret, (long) i << 48, readEntry(m_addressTableDirectory, i & NID_LEVEL_BITMASK) & ADDRESS.BITMASK, LID_TABLE_LEVELS - 1);
+                getAllRanges(ret, (long) i << 48,
+                        ADDRESS.get(readEntry(m_addressTableDirectory, i & NID_LEVEL_BITMASK, NID_TABLE_SIZE)),
+                        LID_TABLE_LEVELS - 1);
             }
         }
 
@@ -272,7 +276,7 @@ public final class CIDTable {
             }
 
             if (level > 0) {
-                entry = readAddress(addressTable, index);
+                entry = ADDRESS.get(readEntry(addressTable, index, LID_TABLE_SIZE));
 
                 if (entry <= 0) {
                     break;
@@ -287,7 +291,7 @@ public final class CIDTable {
                 }
 
                 // get entry to chunk from table level 0
-                return readEntry(addressTable, index);
+                return readEntry(addressTable, index, LID_TABLE_SIZE);
             }
 
             level--;
@@ -326,7 +330,7 @@ public final class CIDTable {
             }
 
             if (level > 0) {
-                entry = readAddress(addressTable, index);
+                entry = ADDRESS.get(readEntry(addressTable, index, LID_TABLE_SIZE));
 
                 if (entry <= 0) {
                     break;
@@ -401,13 +405,14 @@ public final class CIDTable {
      *
      * @param p_chunkID
      *     the ChunkID of the entry
-     * @param p_addressChunk
-     *     the address of the chunk
+     * @param p_chunkEntry
+     *     the coded entry of the chunk with the address, a 10 bit space of a length field and different states
      * @return True if successful, false if allocation of a new table failed, out of memory
      */
-    public boolean set(final long p_chunkID, final long p_addressChunk) {
+    public boolean set(final long p_chunkID, final long p_chunkEntry) {
         long index;
         long entry;
+        long tableSize = NID_TABLE_SIZE;
 
         int level = 0;
         long addressTable;
@@ -426,25 +431,30 @@ public final class CIDTable {
                 index = p_chunkID >> BITS_PER_LID_LEVEL * level & NID_LEVEL_BITMASK;
             } else {
                 index = p_chunkID >> BITS_PER_LID_LEVEL * level & LID_LEVEL_BITMASK;
+                tableSize = LID_TABLE_SIZE;
             }
 
             if (level > 0) {
+
                 // Read table entry
-                entry = readEntry(addressTable, index);
+                entry = readEntry(addressTable, index, tableSize);
                 if (entry == 0) {
                     entry = createLIDTable();
                     if (entry == -1) {
                         return false;
                     }
-                    writeEntry(addressTable, index, entry);
+                    writeEntry(addressTable, index, entry, tableSize);
                 }
 
                 // move on to next table
-                addressTable = entry & ADDRESS.BITMASK;
+                addressTable = ADDRESS.get(entry);
             } else {
                 // Set the level 0 entry (address to active chunk)
-                // valid and active entry, delete flag 0
-                writeEntry(addressTable, index, p_addressChunk & ADDRESS.BITMASK);
+                // valid and active entry with internal 10 bit for a length field
+                // or  part of it
+                entry = p_chunkEntry;
+
+                writeEntry(addressTable, index, entry, tableSize);
 
                 // add table address to table 0 to cache
                 if (putCache) {
@@ -467,12 +477,13 @@ public final class CIDTable {
      *     the ChunkID of the entry
      * @param p_flagZombie
      *     Flag the deleted entry as a zombie or not zombie i.e. fully deleted.
-     * @return The address of the chunk which was removed from the table.
+     * @return The entry of the chunk which was removed from the table.
      */
     public long delete(final long p_chunkID, final boolean p_flagZombie) {
         long ret = -1;
         long index;
         long entry;
+        long tableSize = NID_TABLE_SIZE;
 
         int level = 0;
         long addressTable;
@@ -489,25 +500,26 @@ public final class CIDTable {
                 index = p_chunkID >> BITS_PER_LID_LEVEL * level & NID_LEVEL_BITMASK;
             } else {
                 index = p_chunkID >> BITS_PER_LID_LEVEL * level & LID_LEVEL_BITMASK;
+                tableSize = LID_TABLE_SIZE;
             }
 
             if (level > 0) {
                 // Read table entry
-                entry = readEntry(addressTable, index);
+                entry = readEntry(addressTable, index, tableSize);
                 if ((entry & FULL_FLAG) > 0) {
                     // Delete full flag
                     entry &= ~FULL_FLAG;
-                    writeEntry(addressTable, index, entry);
+                    writeEntry(addressTable, index, entry, tableSize);
                 }
 
-                if ((entry & ADDRESS.BITMASK) == 0) {
+                if (ADDRESS.get(entry) == 0) {
                     break;
                 }
 
                 // Delete entry in the following table
-                addressTable = entry & ADDRESS.BITMASK;
+                addressTable = ADDRESS.get(entry);
             } else {
-                ret = readEntry(addressTable, index) & ADDRESS.BITMASK;
+                ret = readEntry(addressTable, index, tableSize);
 
                 // already deleted
                 if (ret == FREE_ENTRY || ret == ZOMBIE_ENTRY) {
@@ -518,9 +530,9 @@ public final class CIDTable {
                 // invalid + active address but deleted
                 // -> zombie entry
                 if (p_flagZombie) {
-                    writeEntry(addressTable, index, ZOMBIE_ENTRY);
+                    writeEntry(addressTable, index, ZOMBIE_ENTRY, tableSize);
                 } else {
-                    writeEntry(addressTable, index, FREE_ENTRY);
+                    writeEntry(addressTable, index, FREE_ENTRY, tableSize);
                 }
             }
 
@@ -577,27 +589,18 @@ public final class CIDTable {
     }
 
     /**
-     * Read the address Part of a entry
-     *
-     * @param p_addressTable Address of the table
-     * @param p_index Index of the entry
-     * @return Address part of entry
-     */
-    long readAddress(final long p_addressTable, final long p_index){
-        return (readEntry(p_addressTable, p_index) & ADDRESS.BITMASK);
-    }
-
-    /**
      * Reads a table entry
      *
      * @param p_addressTable
      *     the table
      * @param p_index
      *     the index of the entry
+     * @param p_tableSize
+     *     the size of the table
      * @return the entry
      */
-    long readEntry(final long p_addressTable, final long p_index) {
-        return m_rawMemory.readLong(p_addressTable, ENTRY_SIZE * p_index); //& 0xFFFFFFFFFFL;
+    long readEntry(final long p_addressTable, final long p_index, final long p_tableSize) {
+        return m_rawMemory.readLong(p_addressTable, ENTRY_SIZE * p_index, p_tableSize);
     }
 
     /**
@@ -609,9 +612,11 @@ public final class CIDTable {
      *     the index of the entry
      * @param p_entry
      *     the entry
+     * @param p_tableSize
+     *     the size of the table
      */
-    void writeEntry(final long p_addressTable, final long p_index, final long p_entry) {
-        m_rawMemory.writeLong(p_addressTable, ENTRY_SIZE * p_index, p_entry);
+    void writeEntry(final long p_addressTable, final long p_index, final long p_entry, final long p_tableSize) {
+        m_rawMemory.writeLong(p_addressTable, ENTRY_SIZE * p_index, p_entry, p_tableSize);
     }
 
     /**
@@ -644,14 +649,22 @@ public final class CIDTable {
         long value;
 
         while(true) {
-            value = m_rawMemory.readLong(p_tableAddress, m_offset);
+            value = m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE);
 
+            //for evalutation do three tries
+            //1. with Thread.yield()
+            //2. with LockSupport.parkNanos(long)
+            //3. no Thread Handle
             if ((value & READ_ACCESS.BITMASK) == READ_ACCESS.BITMASK ||
-                    (value & WRITE_ACCESS.BITMASK) == WRITE_ACCESS.BITMASK)
+                    (value & WRITE_ACCESS.BITMASK) == WRITE_ACCESS.BITMASK){
+                //Thread.yield();
                 continue;
+            }
 
             if (m_rawMemory.compareAndSwapLong(p_tableAddress, m_offset, value, value + READ_INCREMENT))
                 break;
+
+            //Thread.yield();
         }
     }
 
@@ -684,13 +697,16 @@ public final class CIDTable {
         long value;
 
         while(true){
-            value = m_rawMemory.readLong(p_tableAddress, m_offset);
+            value = m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE);
 
+            //no read lock is set
             if((value & READ_ACCESS.BITMASK) == 0)
                 return;
 
             if(m_rawMemory.compareAndSwapLong(p_tableAddress, m_offset, value, value - READ_INCREMENT))
                 break;
+
+            //Thread.yield();
 
         }
     }
@@ -725,7 +741,7 @@ public final class CIDTable {
         long value;
 
         while(true){
-            value = m_rawMemory.readLong(p_tableAddress, m_offset);
+            value = m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE);
 
             if((value & WRITE_ACCESS.BITMASK) == WRITE_ACCESS.BITMASK)
                 continue;
@@ -736,7 +752,7 @@ public final class CIDTable {
         }
 
         // wait until no present read access
-        while((m_rawMemory.readLong(p_tableAddress, m_offset) & READ_ACCESS.BITMASK) != 0){ }
+        while((m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE) & READ_ACCESS.BITMASK) != 0){ }
     }
 
 
@@ -769,7 +785,7 @@ public final class CIDTable {
 
         // delete write access flag
         while(true){
-            value = m_rawMemory.readLong(p_tableAddress, m_offset);
+            value = m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE);
             if((value & WRITE_ACCESS.BITMASK) == 0)
                 return;
 
@@ -800,11 +816,11 @@ public final class CIDTable {
 
         //MemoryManagerComponent.SOP_MALLOC.enter(NID_TABLE_SIZE);
         // #endif /* STATISTICS */
-        ret = m_rawMemory.malloc(NID_TABLE_SIZE);
+        ret = m_rawMemory.mallocRaw(NID_TABLE_SIZE);
         // #ifdef STATISTICS
         //MemoryManagerComponent.SOP_MALLOC.leave();
         // #endif /* STATISTICS */
-        if (ret != SmallObjectHeap.INVALID_ADDRESS) {
+        if (ret > SmallObjectHeap.INVALID_ADDRESS) {
             m_rawMemory.set(ret, NID_TABLE_SIZE, (byte) 0);
             m_totalMemoryTables += NID_TABLE_SIZE;
             m_tableCount++;
@@ -829,11 +845,11 @@ public final class CIDTable {
 
         //MemoryManagerComponent.SOP_MALLOC.enter(LID_TABLE_SIZE);
         // #endif /* STATISTICS */
-        ret = m_rawMemory.malloc(LID_TABLE_SIZE);
+        ret = m_rawMemory.mallocRaw(LID_TABLE_SIZE);
         // #ifdef STATISTICS
         //MemoryManagerComponent.SOP_MALLOC.leave();
         // #endif /* STATISTICS */
-        if (ret != SmallObjectHeap.INVALID_ADDRESS) {
+        if (ret > SmallObjectHeap.INVALID_ADDRESS) {
             m_rawMemory.set(ret, LID_TABLE_SIZE, (byte) 0);
             m_totalMemoryTables += LID_TABLE_SIZE;
             m_tableCount++;
@@ -859,11 +875,11 @@ public final class CIDTable {
         long entry;
 
         for (int i = 0; i < ENTRIES_PER_LID_LEVEL; i++) {
-            entry = readEntry(p_table, i);
+            entry = readEntry(p_table, i, LID_TABLE_SIZE);
             if (entry > 0) {
 
                 if (p_level > 0) {
-                    getAllRanges(p_ret, p_unfinishedCID + (i << BITS_PER_LID_LEVEL * p_level), entry & ADDRESS.BITMASK, p_level - 1);
+                    getAllRanges(p_ret, p_unfinishedCID + (i << BITS_PER_LID_LEVEL * p_level), ADDRESS.get(entry), p_level - 1);
                 } else {
                     if (entry != ZOMBIE_ENTRY) {
                         long curCID = p_unfinishedCID + i;
@@ -904,10 +920,10 @@ public final class CIDTable {
 
         ret = new ArrayListLong();
         for (int i = 0; i < ENTRIES_PER_LID_LEVEL; i++) {
-            entry = readEntry(p_table, i);
+            entry = readEntry(p_table, i, LID_TABLE_SIZE);
             if (entry > 0) {
                 if (p_level > 0) {
-                    ret.addAll(getAllEntries(p_unfinishedCID + (i << BITS_PER_LID_LEVEL * p_level), entry & ADDRESS.BITMASK, p_level - 1));
+                    ret.addAll(getAllEntries(p_unfinishedCID + (i << BITS_PER_LID_LEVEL * p_level), ADDRESS.get(entry), p_level - 1));
                 } else {
                     ret.add(p_unfinishedCID + i);
                 }
@@ -934,7 +950,7 @@ public final class CIDTable {
 
         if (p_level == LID_TABLE_LEVELS) {
             for (int i = 0; i < ENTRIES_FOR_NID_LEVEL; i++) {
-                entry = readEntry(p_addressTable, i) & ADDRESS.BITMASK;
+                entry = ADDRESS.get(readEntry(p_addressTable, i, NID_TABLE_SIZE));
 
                 if (entry > 0) {
                     countTables(entry, p_level - 1, p_count);
@@ -942,7 +958,7 @@ public final class CIDTable {
             }
         } else {
             for (int i = 0; i < ENTRIES_PER_LID_LEVEL; i++) {
-                entry = readEntry(p_addressTable, i) & ADDRESS.BITMASK;
+                entry = ADDRESS.get(readEntry(p_addressTable, i, LID_TABLE_SIZE));
 
                 if (entry > 0) {
                     if (p_level > 1) {
@@ -1099,7 +1115,9 @@ public final class CIDTable {
          * Finds free LIDs in the CIDTable
          */
         private void findFreeLIDs() {
-            findFreeLIDs(readEntry(m_addressTableDirectory, m_ownNodeID & NID_LEVEL_BITMASK) & ADDRESS.BITMASK, LID_TABLE_LEVELS - 1, 0);
+            findFreeLIDs(ADDRESS.get(readEntry(m_addressTableDirectory,
+                    m_ownNodeID & NID_LEVEL_BITMASK, NID_TABLE_SIZE)),
+                    LID_TABLE_LEVELS - 1, 0);
         }
 
         /**
@@ -1120,15 +1138,15 @@ public final class CIDTable {
 
             for (int i = 0; i < ENTRIES_PER_LID_LEVEL; i++) {
                 // Read table entry
-                entry = readEntry(p_addressTable, i);
+                entry = readEntry(p_addressTable, i, LID_TABLE_SIZE);
 
                 if (p_level > 0) {
                     if (entry > 0) {
                         // Get free LocalID in the next table
-                        if (!findFreeLIDs(entry & ADDRESS.BITMASK, p_level - 1, i << BITS_PER_LID_LEVEL * p_level)) {
+                        if (!findFreeLIDs(ADDRESS.get(entry), p_level - 1, i << BITS_PER_LID_LEVEL * p_level)) {
                             // Mark the table as full
                             entry |= FULL_FLAG;
-                            writeEntry(p_addressTable, i, entry);
+                            writeEntry(p_addressTable, i, entry, LID_TABLE_SIZE);
                         } else {
                             ret = true;
                         }
@@ -1139,7 +1157,7 @@ public final class CIDTable {
                         localID = p_offset + i;
 
                         // cleanup zombie in table
-                        writeEntry(p_addressTable, i, FREE_ENTRY);
+                        writeEntry(p_addressTable, i, FREE_ENTRY, LID_TABLE_SIZE);
 
                         m_localIDs[m_putPosition] = localID;
                         m_putPosition = (m_putPosition + 1) % m_localIDs.length;
