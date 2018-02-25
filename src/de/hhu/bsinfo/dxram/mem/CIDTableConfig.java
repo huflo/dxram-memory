@@ -3,6 +3,8 @@ package de.hhu.bsinfo.dxram.mem;
 import de.hhu.bsinfo.utils.BitMask;
 
 /**
+ * Central place for the CIDTable entry logic
+ *
  * @author Florian Hucke (florian.hucke@hhu.de) on 16.02.18
  * @projectname dxram-memory
  */
@@ -36,24 +38,29 @@ public class CIDTableConfig {
     public static final class Entry {
         private static BitMask bm = new BitMask(Long.SIZE);
 
-        public long BITMASK;
-        public byte OFFSET;
-        public byte SIZE;
+        public final long BITMASK;
+        public final byte OFFSET;
+        public final byte SIZE;
 
-        private Entry(byte usedBits){
+        /**
+         * Constructor
+         *
+         * @param neededBits Needed bit for the entry
+         */
+        private Entry(final byte neededBits){
             OFFSET = bm.getUsedBits();
-            BITMASK = bm.checkedCreate(usedBits);
-            SIZE = usedBits;
+            BITMASK = bm.checkedCreate(neededBits);
+            SIZE = neededBits;
         }
 
         /**
          * Create a bit partition for a level 0 entry
          *
-         * @param usedBits number of bits the entry need
+         * @param neededBits number of bits the entry need
          * @return a Entry Object
          */
-        private static Entry create(int usedBits){
-            return new Entry((byte)usedBits);
+        private static Entry create(final int neededBits){
+            return new Entry((byte)neededBits);
         }
 
         /**
@@ -62,7 +69,7 @@ public class CIDTableConfig {
          * @param p_tableEntry the level 0 table entry
          * @return the saved data
          */
-        public long get(long p_tableEntry){
+        public final long get(final long p_tableEntry){
             return (p_tableEntry & BITMASK) >> OFFSET;
         }
     }
