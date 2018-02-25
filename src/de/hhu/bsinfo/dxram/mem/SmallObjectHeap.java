@@ -13,36 +13,34 @@
 
 package de.hhu.bsinfo.dxram.mem;
 
+import de.hhu.bsinfo.soh.MemoryRuntimeException;
+import de.hhu.bsinfo.soh.StorageUnsafeMemory;
+import de.hhu.bsinfo.utils.serialization.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
-import de.hhu.bsinfo.soh.MemoryRuntimeException;
-import de.hhu.bsinfo.soh.StorageUnsafeMemory;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import de.hhu.bsinfo.utils.serialization.Exportable;
-import de.hhu.bsinfo.utils.serialization.Exporter;
-import de.hhu.bsinfo.utils.serialization.Importable;
-import de.hhu.bsinfo.utils.serialization.Importer;
-import de.hhu.bsinfo.utils.serialization.RandomAccessFileImExporter;
+import static de.hhu.bsinfo.dxram.mem.CIDTableConfig.LENGTH_FIELD;
 
 /**
  * Very efficient memory allocator for many small objects
  *
  * @author Florian Klein, florian.klein@hhu.de, 13.02.2014
  * @author Stefan Nothaas, stefan.nothaas@hhu.de, 11.11.2015
+ * @author Florian Hucke, florian.hucke@hhu.de, 06.02.2018
  */
 public final class SmallObjectHeap implements Importable, Exportable {
     public static final int INVALID_ADDRESS = 0;
     static final byte POINTER_SIZE = 6;
     static final int SIZE_MARKER_BYTE = 1;
-    static final byte ALLOC_BLOCK_FLAGS_OFFSET = 0x5;
+    static final byte ALLOC_BLOCK_FLAGS_OFFSET = 0x3;
     private static final Logger LOGGER = LogManager.getFormatterLogger(SmallObjectHeap.class.getSimpleName());
     private static final long MAX_SET_SIZE = (long) Math.pow(2, CIDTableConfig.ADDRESS.SIZE);
     private static final byte SMALL_BLOCK_SIZE = 64;
-    private static final byte SINGLE_BYTE_MARKER = 0xF;
+    static final byte SINGLE_BYTE_MARKER = 0xF;
     // Attributes, have them accessible by the package to enable walking and analyzing the heap
     // don't modify or access them otherwise
     long m_baseFreeBlockList;
@@ -60,6 +58,8 @@ public final class SmallObjectHeap implements Importable, Exportable {
      *         The underlying storage to use for this memory.
      * @param p_size
      *         The size of the memory in bytes.
+     * @param p_maxBlockSize
+     *         The maximal size of a memory block in bytes.
      */
     public SmallObjectHeap(final StorageUnsafeMemory p_memory, final long p_size, final int p_maxBlockSize) {
         m_memory = p_memory;
@@ -145,16 +145,17 @@ public final class SmallObjectHeap implements Importable, Exportable {
      *         Marker byte.
      * @return Size of the length field of block with specified marker byte.
      */
-    private static int getSizeFromMarker(final int p_marker) {
+    static int getSizeFromMarker(final int p_marker) {
         int ret;
 
-        if (p_marker <= ALLOC_BLOCK_FLAGS_OFFSET) {
-            // free block size
-            ret = p_marker;
-        } else {
-            // allocated block sizes 1, 2, 3, 4 are used
+        if (p_marker == SINGLE_BYTE_MARKER)
+            ret = 0;
+        else if (p_marker == 0 || p_marker == 1)
+            ret = 1;
+        else if (p_marker == 2)
+            ret = 6;
+        else
             ret = p_marker - ALLOC_BLOCK_FLAGS_OFFSET;
-        }
 
         return ret;
     }
@@ -166,12 +167,16 @@ public final class SmallObjectHeap implements Importable, Exportable {
      *         Memory block size
      * @return Size of the length field to fit the size of the memory block
      */
-    private static int calculateLengthFieldSizeAllocBlock(final int p_size) {
-        if (p_size >= 1 << 24) {
+    static int calculateLengthFieldSizeAllocBlock(final int p_size) {
+        int size = p_size;
+
+        if (size == 0){
+            return 0;
+        } else if (size >= 1 << 24) {
             return 4;
-        } else if (p_size >= 1 << 16) {
+        } else if (size >= 1 << 16) {
             return 3;
-        } else if (p_size >= 1 << 8) {
+        } else if (size >= 1 << 8) {
             return 2;
         } else {
             return 1;
@@ -1037,12 +1042,12 @@ public final class SmallObjectHeap implements Importable, Exportable {
             list = getList(p_size);
             address = readPointer(m_baseFreeBlockList + list * POINTER_SIZE);
             if (address != INVALID_ADDRESS) {
-                freeLengthFieldSize = readRightPartOfMarker(address - 1);
+                freeLengthFieldSize = getSizeFromMarker(readRightPartOfMarker(address - 1));
                 freeSize = read(address, freeLengthFieldSize);
                 while (freeSize < p_size && address != INVALID_ADDRESS) {
                     address = readPointer(address + freeLengthFieldSize + POINTER_SIZE);
                     if (address != INVALID_ADDRESS) {
-                        freeLengthFieldSize = readRightPartOfMarker(address - 1);
+                        freeLengthFieldSize = getSizeFromMarker(readRightPartOfMarker(address - 1));
                         freeSize = read(address, freeLengthFieldSize);
                     }
                 }
@@ -1065,7 +1070,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
         long freeSize;
         int freeLengthFieldSize;
 
-        freeLengthFieldSize = readRightPartOfMarker(p_address - SIZE_MARKER_BYTE);
+        freeLengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
         freeSize = read(p_address, freeLengthFieldSize);
         if (freeSize == p_size) {
             m_status.m_free -= p_size;
@@ -1240,26 +1245,25 @@ public final class SmallObjectHeap implements Importable, Exportable {
         freeSize = blockSize + lengthFieldSize;
         address = p_address;
 
+
         // only merge if left neighbor exists (beginning of memory area)
-        if (address - SIZE_MARKER_BYTE != 0) {
+        if (address - SIZE_MARKER_BYTE > INVALID_ADDRESS) {
             // Read left part of the marker on the left
             leftMarker = readLeftPartOfMarker(address - 1);
+            int leftLengthFieldSize = getSizeFromMarker(leftMarker);
             leftFree = true;
             switch (leftMarker) {
                 case 0:
                     // Left neighbor block (<= 12 byte) is free -> merge free blocks
                     // -1, length field size is 1
-                    leftSize = read(address - SIZE_MARKER_BYTE - 1, 1);
+                    leftSize = read(address - SIZE_MARKER_BYTE - leftLengthFieldSize, leftLengthFieldSize);
                     // merge marker byte
                     leftSize += SIZE_MARKER_BYTE;
                     break;
                 case 1:
                 case 2:
-                case 3:
-                case 4:
-                case 5:
                     // Left neighbor block is free -> merge free blocks
-                    leftSize = read(address - SIZE_MARKER_BYTE - leftMarker, leftMarker);
+                    leftSize = read(address - SIZE_MARKER_BYTE - leftLengthFieldSize, leftLengthFieldSize);
                     // skip leftSize and marker byte from address to get block offset
                     unhookFreeBlock(address - leftSize - SIZE_MARKER_BYTE);
                     // we also merge the marker byte
@@ -1267,7 +1271,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
                     break;
                 case SINGLE_BYTE_MARKER:
                     // Left byte is free -> merge free blocks
-                    leftSize = 1;
+                    leftSize = SIZE_MARKER_BYTE;
                     break;
                 default:
                     leftSize = 0;
@@ -1284,7 +1288,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
         freeSize += leftSize;
 
         // Only merge if right neighbor within valid area (not inside or past free blocks list)
-        if (address + blockSize + SIZE_MARKER_BYTE != m_baseFreeBlockList) {
+        if (p_address + lengthFieldSize + blockSize + SIZE_MARKER_BYTE < m_baseFreeBlockList) {
 
             // Read right part of the marker on the right
             rightMarker = readRightPartOfMarker(p_address + lengthFieldSize + blockSize);
@@ -1299,9 +1303,6 @@ public final class SmallObjectHeap implements Importable, Exportable {
                     break;
                 case 1:
                 case 2:
-                case 3:
-                case 4:
-                case 5:
                     // Right neighbor block is free -> merge free blocks
                     // + 1 to skip marker byte
                     rightSize = getSizeMemoryBlock(p_address + lengthFieldSize + blockSize + SIZE_MARKER_BYTE);
@@ -1311,7 +1312,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
                     break;
                 case 15:
                     // Right byte is free -> merge free blocks
-                    rightSize = 1;
+                    rightSize = SIZE_MARKER_BYTE;
                     break;
                 default:
                     rightSize = 0;
@@ -1406,24 +1407,25 @@ public final class SmallObjectHeap implements Importable, Exportable {
     private void createFreeBlock(final long p_address, final long p_size) {
         long listOffset;
         int lengthFieldSize;
+        int marker;
         long anchor;
         long size;
 
-        if (p_size < 12) {
-            // If size < 12 -> the block will not be hook in the lists
-            lengthFieldSize = 0;
 
-            write(p_address, p_size, 1);
-            write(p_address + p_size - 1, p_size, 1);
+        if (p_size < (2*POINTER_SIZE + 2)) {
+            // If size < 12 -> the block will not be hook in the lists
+            lengthFieldSize = 1;
+            marker = 0;
+
         } else {
             lengthFieldSize = 1;
+            marker = 1;
 
             // Calculate the number of bytes for the length field
             size = p_size >> 8;
-            while (size > 0) {
-                lengthFieldSize++;
-
-                size >>= 8;
+            if (size != 0){
+                lengthFieldSize = 6;
+                marker = 2;
             }
 
             // Get the corresponding list
@@ -1437,21 +1439,21 @@ public final class SmallObjectHeap implements Importable, Exportable {
             writePointer(p_address + lengthFieldSize + POINTER_SIZE, anchor);
             if (anchor != INVALID_ADDRESS) {
                 // Write pointer of successor
-                int marker;
-                marker = readRightPartOfMarker(anchor - SIZE_MARKER_BYTE);
-                writePointer(anchor + marker, p_address);
+                int tmp_lfs;
+                tmp_lfs = getSizeFromMarker(readRightPartOfMarker(anchor - SIZE_MARKER_BYTE));
+                writePointer(anchor + tmp_lfs, p_address);
             }
             // Write pointer of list
             writePointer(listOffset, p_address);
-
-            // Write length
-            write(p_address, p_size, lengthFieldSize);
-            write(p_address + p_size - lengthFieldSize, p_size, lengthFieldSize);
         }
 
+        // Write length
+        write(p_address, p_size, lengthFieldSize);
+        write(p_address + p_size - lengthFieldSize, p_size, lengthFieldSize);
+
         // Write right and left marker
-        writeRightPartOfMarker(p_address - SIZE_MARKER_BYTE, lengthFieldSize);
-        writeLeftPartOfMarker(p_address + p_size, lengthFieldSize);
+        writeRightPartOfMarker(p_address - SIZE_MARKER_BYTE, marker);
+        writeLeftPartOfMarker(p_address + p_size, marker);
     }
 
     /**
@@ -1466,7 +1468,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
         long nextPointer;
 
         // Read size of length field
-        lengthFieldSize = readRightPartOfMarker(p_address - SIZE_MARKER_BYTE);
+        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
 
         // Read pointers
         prevPointer = readPointer(p_address + lengthFieldSize);
@@ -1726,6 +1728,19 @@ public final class SmallObjectHeap implements Importable, Exportable {
         public int sizeofObject() {
             return Long.BYTES + Integer.BYTES + Long.BYTES * 5;
         }
+    }
+
+
+    //test methods
+
+    public String t_blockInfo(final long p_address, final long p_extLengthField){
+        System.out.println("address: " + p_address);
+        int marker = readRightPartOfMarker(p_address-SIZE_MARKER_BYTE);
+        int lfs = getSizeFromMarker(marker);
+        long lf = read(p_address, lfs);
+
+        return String.format("[%s]Address: 0x%012X, marker %d, embedded LF: %d(size %d), all LF: %d",
+                (marker<ALLOC_BLOCK_FLAGS_OFFSET) ? "FREE":"DATA",p_address, marker, lf, lfs, ((lf << LENGTH_FIELD.SIZE) | (p_extLengthField-1)) + 1);
     }
 
 }
