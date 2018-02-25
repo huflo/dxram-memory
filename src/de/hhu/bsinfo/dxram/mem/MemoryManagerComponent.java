@@ -1638,6 +1638,18 @@ public final class MemoryManagerComponent {//<<
         m_cidTable.writeUnlock(p_chunkID);
     }
 
+    public void analyze(){
+        new MemoryManagerAnalyzer(m_cidTable, m_rawMemory, false, false).analyze();
+    }
+
+    public boolean checkForError(final boolean p_dumpOnError){
+        return checkForError(true, p_dumpOnError);
+    }
+
+    public boolean checkForError(final boolean p_quite, final boolean p_dumpOnError){
+        return new MemoryManagerAnalyzer(m_cidTable, m_rawMemory, p_quite, p_dumpOnError).analyze();
+    }
+
     /**
      * Status object for the memory component containing various information
      * about it.

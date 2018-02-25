@@ -36,19 +36,19 @@ public final class CIDTable {
     private static final byte ENTRY_SIZE = 8;
     static final byte LID_TABLE_LEVELS = 4;
 
-    private static final long FREE_ENTRY = 0;
-    private static final long ZOMBIE_ENTRY = BitMask.createMask(64, 0);
+    static final long FREE_ENTRY = 0;
+    static final long ZOMBIE_ENTRY = BitMask.createMask(64, 0);
     private static final Logger LOGGER = LogManager.getFormatterLogger(CIDTable.class.getSimpleName());
     // statistics recorder
     //private static final StatisticsOperation SOP_CREATE_NID_TABLE = StatisticsRecorderManager.getOperation(MemoryManagerComponent.class, "CreateNIDTable");
     //private static final StatisticsOperation SOP_CREATE_LID_TABLE = StatisticsRecorderManager.getOperation(MemoryManagerComponent.class, "CreateLIDTable");
     private static final byte BITS_PER_LID_LEVEL = 48 / LID_TABLE_LEVELS;
     static final int ENTRIES_PER_LID_LEVEL = (int) Math.pow(2.0, BITS_PER_LID_LEVEL);
-    private static final int LID_TABLE_SIZE = ENTRY_SIZE * ENTRIES_PER_LID_LEVEL + 7;
+    static final int LID_TABLE_SIZE = ENTRY_SIZE * ENTRIES_PER_LID_LEVEL + 7;
     private static final long LID_LEVEL_BITMASK = (int) Math.pow(2.0, BITS_PER_LID_LEVEL) - 1;
     private static final byte BITS_FOR_NID_LEVEL = 16;
     static final int ENTRIES_FOR_NID_LEVEL = (int) Math.pow(2.0, BITS_FOR_NID_LEVEL);
-    private static final int NID_TABLE_SIZE = ENTRY_SIZE * ENTRIES_FOR_NID_LEVEL + 7;
+    static final int NID_TABLE_SIZE = ENTRY_SIZE * ENTRIES_FOR_NID_LEVEL + 7;
     private static final long NID_LEVEL_BITMASK = (int) Math.pow(2.0, BITS_FOR_NID_LEVEL) - 1;
     private short m_ownNodeID;
     private long m_addressTableDirectory = -1;
