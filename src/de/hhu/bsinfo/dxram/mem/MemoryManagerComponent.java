@@ -40,7 +40,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static de.hhu.bsinfo.dxram.mem.CIDTableConfig.*;
+import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.*;
 
 //->import de.hhu.bsinfo.dxram.DXRAMComponentOrder;
 //->import de.hhu.bsinfo.dxram.boot.AbstractBootComponent;

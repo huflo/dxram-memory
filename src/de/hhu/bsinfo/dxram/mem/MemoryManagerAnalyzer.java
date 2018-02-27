@@ -9,7 +9,7 @@ import java.util.Comparator;
 import java.util.LinkedList;
 
 import static de.hhu.bsinfo.dxram.mem.CIDTable.*;
-import static de.hhu.bsinfo.dxram.mem.CIDTableConfig.*;
+import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.*;
 import static de.hhu.bsinfo.dxram.mem.SmallObjectHeap.*;
 
 /**
@@ -61,11 +61,11 @@ public final class MemoryManagerAnalyzer {
 
         //dataBlock have a divided length field in cid 10 bits and 0-32 bits in the data block
         m_dataBlocks = getAllDataBlocks();
-        m_dataBlocks.sort(Comparator.comparingLong(CIDTableConfig.ADDRESS::get));
+        m_dataBlocks.sort(Comparator.comparingLong(CIDTableEntry.ADDRESS::get));
 
         //tables have no length fields because the size is fixed
         m_managementTables = getAllManagementTables();
-        m_managementTables.sort(Comparator.comparingLong(CIDTableConfig.ADDRESS::get));
+        m_managementTables.sort(Comparator.comparingLong(CIDTableEntry.ADDRESS::get));
 
         LOGGER.info(String.format("Colleted data. Found: managed free blocks: %d, data blocks: %d, table: %d",
                 m_freeBlocks.size(), m_dataBlocks.size(), m_managementTables.size()));

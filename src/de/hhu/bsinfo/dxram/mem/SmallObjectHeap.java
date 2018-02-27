@@ -23,7 +23,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
-import static de.hhu.bsinfo.dxram.mem.CIDTableConfig.LENGTH_FIELD;
+import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.*;
 
 /**
  * Very efficient memory allocator for many small objects

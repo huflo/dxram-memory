@@ -20,7 +20,7 @@ import de.hhu.bsinfo.utils.BitMask;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import static de.hhu.bsinfo.dxram.mem.CIDTableConfig.*;
+import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.*;
 
 //import de.hhu.bsinfo.utils.stats.StatisticsOperation;
 //import de.hhu.bsinfo.utils.stats.StatisticsRecorderManager;
