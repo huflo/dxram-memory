@@ -89,7 +89,7 @@ public final class MemoryManagerComponent {//<<
     private SmallObjectHeapDataStructureImExporter[] m_imexporter = new SmallObjectHeapDataStructureImExporter[65536];
 
     private short NODE_ID = 0;//<<
-    private long MEMORY_SIZE = (long)Math.pow(2, 30);//1GB //<<
+    private long MEMORY_SIZE = (long)Math.pow(2, 31);//2GB //<<
     private int BLOCK_SIZE = (int)Math.pow(2,24);//4MB //<<
     private String DUMP_FOLDER = ".";
 
@@ -1622,30 +1622,70 @@ public final class MemoryManagerComponent {//<<
     }
 
 
-    void readLock(final long p_chunkID){
-        m_cidTable.readLock(p_chunkID);
+    /**
+     * Get a read lock on a CID
+     *
+     * @param p_chunkID the cid we want to lock
+     * @return False if the chunk is no longer active. True on success.
+     */
+    final boolean readLock(final long p_chunkID){
+        return m_cidTable.readLock(p_chunkID);
     }
 
-    void readUnlock(final long p_chunkID){
-        m_cidTable.readUnlock(p_chunkID);
+    /**
+     * Release a read lock on a CID
+     *
+     * @param p_chunkID the ID of the chunk
+     * @return False if there was no lock or the chunk is no longer active. True on success.
+     */
+    final boolean readUnlock(final long p_chunkID){
+        return m_cidTable.readUnlock(p_chunkID);
     }
 
-    void writeLock(final long p_chunkID){
-        m_cidTable.writeLock(p_chunkID);
+    /**
+     * Get a write lock on a CID
+     *
+     * @param p_chunkID the cid we want to lock
+     * @return False if the chunk is no longer active. True on success.
+     */
+    final boolean writeLock(final long p_chunkID){
+        return m_cidTable.writeLock(p_chunkID);
     }
 
-    void writeUnlock(final long p_chunkID){
-        m_cidTable.writeUnlock(p_chunkID);
+    /**
+     * Release a read lock on a CID
+     *
+     * @param p_chunkID the ID of the chunk
+     * @return False if there was no lock or the chunk is no longer active. True on success.
+     */
+    final boolean writeUnlock(final long p_chunkID){
+        return m_cidTable.writeUnlock(p_chunkID);
     }
 
+    /**
+     * Print the heap structure
+     */
     public void analyze(){
         new MemoryManagerAnalyzer(m_cidTable, m_rawMemory, false, false).analyze();
     }
 
+    /**
+     * Check the heap for errors
+     *
+     * @param p_dumpOnError Dump the heap on a error
+     * @return True if no error was found, else false
+     */
     public boolean checkForError(final boolean p_dumpOnError){
         return checkForError(true, p_dumpOnError);
     }
 
+    /**
+     * Check the heap for errors
+     *
+     * @param p_quite Print only errors
+     * @param p_dumpOnError Dump the heap on a error
+     * @return True if no error was found, else false
+     */
     public boolean checkForError(final boolean p_quite, final boolean p_dumpOnError){
         return new MemoryManagerAnalyzer(m_cidTable, m_rawMemory, p_quite, p_dumpOnError).analyze();
     }

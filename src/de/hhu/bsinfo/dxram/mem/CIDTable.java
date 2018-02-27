@@ -599,19 +599,13 @@ public final class CIDTable {
      * Get a read lock on a CID
      *
      * @param p_chunkID the cid we want to lock
-     * @return true if the CID exist else false
+     * @return False if the chunk is no longer active. True on success.
      */
-    final boolean readLock(final long p_chunkID){
+    final boolean readLock(final long p_chunkID) {
         long[] entry;
 
-        if((entry = getAddressOfEntry(p_chunkID)) == null)
-            return false;
-
-        readLock(entry[0], entry[1]);
-
-        //System.out.println("got a read lock " + level0Entry(p_chunkID));
-
-        return true;
+        return (entry = getAddressOfEntry(p_chunkID)) != null &&
+                readLock(entry[0], entry[1]);
     }
 
     /**
@@ -619,13 +613,18 @@ public final class CIDTable {
      *
      * @param p_tableAddress address of the level 0 table
      * @param p_index row in the table
+     * @return False if the chunk is no longer active. True on success.
      */
-    final void readLock(final long p_tableAddress, final long p_index){
+    private boolean readLock(final long p_tableAddress, final long p_index){
         long m_offset = p_index * ENTRY_SIZE;
         long value;
 
         while(true) {
             value = m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE);
+
+            //check if entry is alive
+            if(value == FREE_ENTRY || value == ZOMBIE_ENTRY)
+                return false;
 
             //for evalutation do three tries
             //1. with Thread.yield()
@@ -642,24 +641,21 @@ public final class CIDTable {
 
             //Thread.yield();
         }
+
+        return true;
     }
 
     /**
      * Release a read lock on a CID
      *
      * @param p_chunkID the ID of the chunk
-     * @return true if the CID exist else false
+     * @return False if there was no lock or the chunk is no longer active. True on success.
      */
-    final boolean readUnlock(final long p_chunkID){
+    final boolean readUnlock(final long p_chunkID) {
         long[] entry;
 
-        if((entry = getAddressOfEntry(p_chunkID)) ==  null)
-            return false;
-
-        readUnlock(entry[0], entry[1]);
-        //System.out.println("read unlock: " + level0Entry(p_chunkID));
-
-        return true;
+        return (entry = getAddressOfEntry(p_chunkID)) != null &&
+                readUnlock(entry[0], entry[1]);
     }
 
     /**
@@ -667,17 +663,22 @@ public final class CIDTable {
      *
      * @param p_tableAddress address of the level 0 table
      * @param p_index row in the table
+     * @return False if there was no lock or the chunk is no longer active. True on success.
      */
-    final void readUnlock(final long p_tableAddress, final long p_index){
+    private boolean readUnlock(final long p_tableAddress, final long p_index){
         long m_offset = p_index * ENTRY_SIZE;
         long value;
 
         while(true){
             value = m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE);
 
+            //check if entry is alive
+            if(value == FREE_ENTRY || value == ZOMBIE_ENTRY)
+                return false;
+
             //no read lock is set
             if((value & READ_ACCESS.BITMASK) == 0)
-                return;
+                return false;
 
             if(m_rawMemory.compareAndSwapLong(p_tableAddress, m_offset, value, value - READ_INCREMENT))
                 break;
@@ -685,25 +686,21 @@ public final class CIDTable {
             //Thread.yield();
 
         }
+        return true;
     }
 
     /**
      * Get a write lock on a CID
      *
      * @param p_chunkID the cid we want to lock
-     * @return true if the CID exist else false
+     * @return False if the chunk is no longer active. True on success.
      */
-    final boolean writeLock(final long p_chunkID){
-
+    final boolean writeLock(final long p_chunkID) {
         long[] entry;
-        if((entry = getAddressOfEntry(p_chunkID)) == null)
-            return false;
 
-        writeLock(entry[0], entry[1]);
-        //System.out.println("write lock: " + level0Entry(p_chunkID));
+        return (entry = getAddressOfEntry(p_chunkID)) != null &&
+                writeLock(entry[0], entry[1]);
 
-
-        return true;
     }
 
     /**
@@ -711,13 +708,18 @@ public final class CIDTable {
      *
      * @param p_tableAddress address of the level 0 table
      * @param p_index row in the table
+     * @return False if the chunk is no longer active. True on success.
      */
-    final void writeLock(final long p_tableAddress, final long p_index){
+    final boolean writeLock(final long p_tableAddress, final long p_index){
         long m_offset = p_index * ENTRY_SIZE;
         long value;
 
         while(true){
             value = m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE);
+
+            //check if entry is alive
+            if(value == FREE_ENTRY || value == ZOMBIE_ENTRY)
+                return false;
 
             if((value & WRITE_ACCESS.BITMASK) == WRITE_ACCESS.BITMASK)
                 continue;
@@ -728,7 +730,9 @@ public final class CIDTable {
         }
 
         // wait until no present read access
-        while((m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE) & READ_ACCESS.BITMASK) != 0){ }
+        while((m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE) & READ_ACCESS.BITMASK) != 0);
+
+        return true;
     }
 
 
@@ -736,17 +740,15 @@ public final class CIDTable {
      * Release a read lock on a CID
      *
      * @param p_chunkID the ID of the chunk
-     * @return true if the CID exist else false
+     * @return False if there was no lock or the chunk is no longer active. True on success.
      */
-    final boolean writeUnlock(final long p_chunkID){
+    final boolean writeUnlock(final long p_chunkID) {
 
         long[] entry;
-        if((entry = getAddressOfEntry(p_chunkID)) == null)
-            return false;
+        return (entry = getAddressOfEntry(p_chunkID)) != null &&
+                writeUnlock(entry[0], entry[1]);
 
-        writeUnlock(entry[0], entry[1]);
 
-        return true;
     }
 
     /**
@@ -754,20 +756,28 @@ public final class CIDTable {
      *
      * @param p_tableAddress address of the level 0 table
      * @param p_index row in the table
+     * @return False if there was no lock or the chunk is no longer active. True on success.
      */
-    final void writeUnlock(final long p_tableAddress, final long p_index){
+    private boolean writeUnlock(final long p_tableAddress, final long p_index){
         long m_offset = p_index * ENTRY_SIZE;
         long value;
 
         // delete write access flag
         while(true){
             value = m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE);
+
+            //Check if entry is alive
+            if(value == FREE_ENTRY || value == ZOMBIE_ENTRY)
+                return false;
+
             if((value & WRITE_ACCESS.BITMASK) == 0)
-                return;
+                return false;
 
             if(m_rawMemory.compareAndSwapLong(p_tableAddress, m_offset, value, value & ~WRITE_ACCESS.BITMASK))
                 break;
         }
+
+        return false;
     }
 
     /**
