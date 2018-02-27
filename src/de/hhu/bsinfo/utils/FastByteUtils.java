@@ -1,7 +1,5 @@
 package de.hhu.bsinfo.utils;
 
-import java.util.Arrays;
-
 /**
  * @author Florian Hucke (florian.hucke@hhu.de) on 25.02.18
  * @projectname dxram-memory

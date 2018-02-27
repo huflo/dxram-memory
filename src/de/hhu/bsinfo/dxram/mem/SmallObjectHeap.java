@@ -38,15 +38,15 @@ public final class SmallObjectHeap implements Importable, Exportable {
     static final int SIZE_MARKER_BYTE = 1;
     static final byte ALLOC_BLOCK_FLAGS_OFFSET = 0x3;
     private static final Logger LOGGER = LogManager.getFormatterLogger(SmallObjectHeap.class.getSimpleName());
-    private static final long MAX_SET_SIZE = (long) Math.pow(2, CIDTableConfig.ADDRESS.SIZE);
+    private static final long MAX_SET_SIZE = (long) Math.pow(2, 30);
     private static final byte SMALL_BLOCK_SIZE = 64;
     static final byte SINGLE_BYTE_MARKER = 0xF;
     // Attributes, have them accessible by the package to enable walking and analyzing the heap
     // don't modify or access them otherwise
     long m_baseFreeBlockList;
-    int m_freeBlocksListSize = -1;
-    long[] m_freeBlockListSizes;
-    StorageUnsafeMemory m_memory;
+    private int m_freeBlocksListSize = -1;
+    private long[] m_freeBlockListSizes;
+    private StorageUnsafeMemory m_memory;
     private int m_maxBlockSize;
     private int m_freeBlocksListCount = -1;
     private Status m_status;
