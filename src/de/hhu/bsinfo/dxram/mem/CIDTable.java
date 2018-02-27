@@ -67,7 +67,7 @@ public final class CIDTable {
      * @param p_ownNodeID
      *     Own node ID
      */
-    public CIDTable(final short p_ownNodeID) {
+    CIDTable(final short p_ownNodeID) {
         m_ownNodeID = p_ownNodeID;
     }
 
@@ -378,7 +378,7 @@ public final class CIDTable {
      *          State of the Chunk use S_NORMAL, S_NOT_MOVEABLE or S_NOT_REMOVEABLE
      * @return A generated entry for the CID Table
      */
-    public static long createEntry(final long p_addressChunk, final long p_size, int p_state){
+    private static long createEntry(final long p_addressChunk, final long p_size, int p_state){
         long entry = 0;
 
         //write address
@@ -543,30 +543,6 @@ public final class CIDTable {
     }
 
     /**
-     * Prints debug informations
-     */
-    public void printDebugInfos() {
-        StringBuilder infos;
-        int[] count;
-
-        count = new int[LID_TABLE_LEVELS + 1];
-
-        countTables(m_addressTableDirectory, LID_TABLE_LEVELS, count);
-
-        infos = new StringBuilder();
-        infos.append("\nCIDTable:\n");
-        for (int i = LID_TABLE_LEVELS; i >= 0; i--) {
-            infos.append('\t');
-            infos.append(count[i]);
-            infos.append(" table(s) on level ");
-            infos.append(i);
-            infos.append('\n');
-        }
-
-        System.out.println(infos);
-    }
-
-    /**
      * Disengages the CIDTable
      */
     void disengage() {
@@ -615,7 +591,7 @@ public final class CIDTable {
      * @param p_tableSize
      *     the size of the table
      */
-    void writeEntry(final long p_addressTable, final long p_index, final long p_entry, final long p_tableSize) {
+    private void writeEntry(final long p_addressTable, final long p_index, final long p_entry, final long p_tableSize) {
         m_rawMemory.writeLong(p_addressTable, ENTRY_SIZE * p_index, p_entry, p_tableSize);
     }
 
@@ -904,74 +880,6 @@ public final class CIDTable {
     }
 
     /**
-     * Adds all ChunkIDs to an ArrayListLong
-     *
-     * @param p_unfinishedCID
-     *     the unfinished ChunkID
-     * @param p_table
-     *     the current table
-     * @param p_level
-     *     the current table level
-     * @return ArrayListLong with all entries
-     */
-    private ArrayListLong getAllEntries(final long p_unfinishedCID, final long p_table, final int p_level) {
-        ArrayListLong ret;
-        long entry;
-
-        ret = new ArrayListLong();
-        for (int i = 0; i < ENTRIES_PER_LID_LEVEL; i++) {
-            entry = readEntry(p_table, i, LID_TABLE_SIZE);
-            if (entry > 0) {
-                if (p_level > 0) {
-                    ret.addAll(getAllEntries(p_unfinishedCID + (i << BITS_PER_LID_LEVEL * p_level), ADDRESS.get(entry), p_level - 1));
-                } else {
-                    ret.add(p_unfinishedCID + i);
-                }
-            }
-        }
-
-        return ret;
-    }
-
-    /**
-     * Counts the subtables
-     *
-     * @param p_addressTable
-     *     the current table
-     * @param p_level
-     *     the level of the table
-     * @param p_count
-     *     the table counts
-     */
-    private void countTables(final long p_addressTable, final int p_level, final int[] p_count) {
-        long entry;
-
-        p_count[p_level]++;
-
-        if (p_level == LID_TABLE_LEVELS) {
-            for (int i = 0; i < ENTRIES_FOR_NID_LEVEL; i++) {
-                entry = ADDRESS.get(readEntry(p_addressTable, i, NID_TABLE_SIZE));
-
-                if (entry > 0) {
-                    countTables(entry, p_level - 1, p_count);
-                }
-            }
-        } else {
-            for (int i = 0; i < ENTRIES_PER_LID_LEVEL; i++) {
-                entry = ADDRESS.get(readEntry(p_addressTable, i, LID_TABLE_SIZE));
-
-                if (entry > 0) {
-                    if (p_level > 1) {
-                        countTables(entry, p_level - 1, p_count);
-                    } else {
-                        p_count[0]++;
-                    }
-                }
-            }
-        }
-    }
-
-    /**
      * Stores free LocalIDs
      *
      * @author Florian Klein
@@ -1085,7 +993,7 @@ public final class CIDTable {
          *     a LocalID
          * @return True if adding an entry to our local ID store was successful, false otherwise.
          */
-        public boolean put(final long p_localID) {
+        boolean put(final long p_localID) {
             boolean ret;
 
             if (m_count < m_localIDs.length) {
@@ -1279,15 +1187,15 @@ public final class CIDTable {
      * @return
      *          a String with detailed information about the chunk
      */
-    public static String entryData(final long p_entry){
+    static String entryData(final long p_entry){
         return String.format("address: 0x%X, lf: %d, read: %d, write: %b, moveable: %b, removeable: %b, full: %b",
                 ADDRESS.get(p_entry),
                 LENGTH_FIELD.get(p_entry),
                 READ_ACCESS.get(p_entry),
-                (p_entry & WRITE_ACCESS.BITMASK) != 0,
-                (p_entry & STATE_NOT_MOVEABLE.BITMASK) == 0,
-                (p_entry & STATE_NOT_REMOVEABLE.BITMASK) == 0,
-                (p_entry & FULL_FLAG) != 0);
+                (p_entry & WRITE_ACCESS.BITMASK) == WRITE_ACCESS.BITMASK,
+                (p_entry & STATE_NOT_MOVEABLE.BITMASK) != STATE_NOT_MOVEABLE.BITMASK,
+                (p_entry & STATE_NOT_REMOVEABLE.BITMASK) != 0,
+                (p_entry & FULL_FLAG) == FULL_FLAG);
 
     }
 
