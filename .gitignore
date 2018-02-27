@@ -8,6 +8,7 @@
 
 #java files
 *.jar
+!/lib/*.jar
 *.class
 hs_err*
 

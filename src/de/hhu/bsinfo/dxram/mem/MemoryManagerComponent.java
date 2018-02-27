@@ -564,12 +564,15 @@ public final class MemoryManagerComponent {//<<
      *         Size in bytes of the payload the chunk contains.
      * @return Chunk ID for the allocated chunk
      */
+    //TODO testing
     public long create(final int p_size) {
         assert p_size > 0;
 
         long address;
         long chunkID;
         long lid;
+
+        long entry;
 
         // #if LOGGER == TRACE
         LOGGER.trace("ENTER create p_size %d", p_size);
@@ -594,6 +597,9 @@ public final class MemoryManagerComponent {//<<
             if (address > SmallObjectHeap.INVALID_ADDRESS) {
                 //->chunkID = ((long) m_boot.getNodeID() << 48) + lid;
                 chunkID = ((long) NODE_ID << 48) + lid;//<<
+
+                entry = CIDTable.createEntry(address, p_size);
+
                 // register new chunk in cid table
                 if (!m_cidTable.set(chunkID, entry)) {
                     // on demand allocation of new table failed

@@ -50,6 +50,13 @@ public final class CIDTable {
     static final int ENTRIES_FOR_NID_LEVEL = (int) Math.pow(2.0, BITS_FOR_NID_LEVEL);
     static final int NID_TABLE_SIZE = ENTRY_SIZE * ENTRIES_FOR_NID_LEVEL + 7;
     private static final long NID_LEVEL_BITMASK = (int) Math.pow(2.0, BITS_FOR_NID_LEVEL) - 1;
+
+    //Flags vor level 0 entries
+    static final int S_NORMAL = 0;
+    static final int S_NOT_MOVE = 1;
+    static final int S_NOT_REMOVE = 2;
+
+
     private short m_ownNodeID;
     private long m_addressTableDirectory = -1;
     private SmallObjectHeap m_rawMemory;
