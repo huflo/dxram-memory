@@ -63,6 +63,7 @@ import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.*;
  * @author Stefan Nothaas, stefan.nothaas@hhu.de, 11.11.2015
  * @author Florian Hucke, florian.hucke@hhu.de, 09.02.2018
  */
+@Deprecated
 //->public final class MemoryManagerComponent extends AbstractDXRAMComponent<MemoryManagerComponentConfig> {
 public final class MemoryManagerComponent {//<<
     // statistics recording
