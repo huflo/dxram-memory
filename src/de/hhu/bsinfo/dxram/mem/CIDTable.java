@@ -32,7 +32,7 @@ import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.*;
  * @author Stefan Nothaas, stefan.nothaas@hhu.de, 11.11.2015
  * @author Florian Hucke, florian.hucke@hhu.de, 06.02.2018
  */
-public final class CIDTable {
+final class CIDTable {
     private static final byte ENTRY_SIZE = 8;
     static final byte LID_TABLE_LEVELS = 4;
 
@@ -51,13 +51,7 @@ public final class CIDTable {
     static final int NID_TABLE_SIZE = ENTRY_SIZE * ENTRIES_FOR_NID_LEVEL + 7;
     private static final long NID_LEVEL_BITMASK = (int) Math.pow(2.0, BITS_FOR_NID_LEVEL) - 1;
 
-    //Flags vor level 0 entries
-    static final int S_NORMAL = 0;
-    static final int S_NOT_MOVE = 1;
-    static final int S_NOT_REMOVE = 2;
-
-
-    private short m_ownNodeID;
+    short m_ownNodeID;
     private long m_addressTableDirectory = -1;
     private SmallObjectHeap m_rawMemory;
     private int m_tableCount = -1;
@@ -230,7 +224,7 @@ public final class CIDTable {
      * @param p_rawMemory
      *     The raw memory instance to use for allocation.
      */
-    public void initialize(final SmallObjectHeap p_rawMemory) {
+    void initialize(final SmallObjectHeap p_rawMemory) {
         m_rawMemory = p_rawMemory;
         m_tableCount = 0;
         m_totalMemoryTables = 0;
@@ -259,7 +253,7 @@ public final class CIDTable {
      *     the ChunkID of the entry
      * @return the entry. 0 for invalid/unused.
      */
-    public long get(final long p_chunkID) {
+    long get(final long p_chunkID) {
         long index;
         long entry;
 
@@ -337,14 +331,14 @@ public final class CIDTable {
             }
 
             if (level > 0) {
-                entry = ADDRESS.get(readEntry(addressTable, index, LID_TABLE_SIZE));
+                entry = readEntry(addressTable, index, LID_TABLE_SIZE);
 
-                if (entry <= 0) {
+                if (entry == ZOMBIE_ENTRY || entry == FREE_ENTRY) {
                     break;
                 }
 
                 // move on to next table
-                addressTable = entry;
+                addressTable = ADDRESS.get(entry);
             } else {
                 // add table 0 address to cache
                 if (putCache) {
@@ -362,52 +356,6 @@ public final class CIDTable {
     }
 
     /**
-     * Create a normal level 0 entry
-     *
-     * @param p_address
-     *          Address on the heap
-     * @param p_size
-     *          Size of the chunk
-     * @return A generated normal entry for the CID Table
-     */
-    public static long createEntry(final long p_address, final long p_size){
-        return createEntry(p_address, p_size, S_NORMAL);
-    }
-
-    /**
-     * Create a level 0 entry
-     *
-     * @param p_addressChunk
-     *          Address on the heap
-     * @param p_size
-     *          Size of the chunk
-     * @param p_state
-     *          State of the Chunk use S_NORMAL, S_NOT_MOVEABLE or S_NOT_REMOVEABLE
-     * @return A generated entry for the CID Table
-     */
-    private static long createEntry(final long p_addressChunk, final long p_size, int p_state){
-        long entry = 0;
-
-        //write address
-        entry |= ((p_addressChunk << ADDRESS.OFFSET) & ADDRESS.BITMASK);
-
-        //length field
-        entry |= ((p_size-1) & (LENGTH_FIELD.BITMASK >> LENGTH_FIELD.OFFSET)) << LENGTH_FIELD.OFFSET;
-
-        //states: 0: normal, 1: no remove, 2: no move (implies remove)
-        if(0 <= p_state && p_state < 4){
-            if(p_state == S_NOT_REMOVE)
-                entry |= STATE_NOT_REMOVEABLE.BITMASK;
-            else if (p_state == S_NOT_MOVE)
-                entry |= STATE_NOT_MOVEABLE.BITMASK;
-        } else {
-            System.out.println(String.format("[ERROR]: invalid state %d, set state to normal", p_state));
-        }
-
-        return entry;
-    }
-
-    /**
      * Sets an entry of the level 0 table
      *
      * @param p_chunkID
@@ -416,7 +364,7 @@ public final class CIDTable {
      *     the coded entry of the chunk with the address, a 10 bit space of a length field and different states
      * @return True if successful, false if allocation of a new table failed, out of memory
      */
-    public boolean set(final long p_chunkID, final long p_chunkEntry) {
+    boolean set(final long p_chunkID, final long p_chunkEntry) {
         long index;
         long entry;
         long tableSize = NID_TABLE_SIZE;
@@ -486,21 +434,23 @@ public final class CIDTable {
      *     Flag the deleted entry as a zombie or not zombie i.e. fully deleted.
      * @return The entry of the chunk which was removed from the table.
      */
-    public long delete(final long p_chunkID, final boolean p_flagZombie) {
+    long delete(final long p_chunkID, final boolean p_flagZombie) {
         long ret = -1;
         long index;
         long entry;
         long tableSize = NID_TABLE_SIZE;
 
-        int level = 0;
-        long addressTable;
+        int level = 4;
+        long addressTable = m_addressTableDirectory;
+
+        //caching is not effective here. If a level 0 table in the level 1 table is marked as full this marker is kept.
 
         // try to jump to table level 0 using the cache
-        addressTable = m_cache[(int) Thread.currentThread().getId()].getTableLevel0(p_chunkID);
-        if (addressTable == -1) {
-            level = LID_TABLE_LEVELS;
-            addressTable = m_addressTableDirectory;
-        }
+        //addressTable = m_cache[(int) Thread.currentThread().getId()].getTableLevel0(p_chunkID);
+        //if (addressTable == -1) {
+        //    level = LID_TABLE_LEVELS;
+        //    addressTable = m_addressTableDirectory;
+        //}
 
         do {
             if (level == LID_TABLE_LEVELS) {
@@ -513,9 +463,11 @@ public final class CIDTable {
             if (level > 0) {
                 // Read table entry
                 entry = readEntry(addressTable, index, tableSize);
-                if ((entry & FULL_FLAG) > 0) {
+
+                //We don't delete Table so only on level 1 we can have a change
+                if (FULL_FLAG.get(entry) && level == 1) {
                     // Delete full flag
-                    entry &= ~FULL_FLAG;
+                    FULL_FLAG.set(entry, false);
                     writeEntry(addressTable, index, entry, tableSize);
                 }
 
@@ -611,8 +563,20 @@ public final class CIDTable {
     final boolean readLock(final long p_chunkID) {
         long[] entry;
 
-        return (entry = getAddressOfEntry(p_chunkID)) != null &&
-                readLock(entry[0], entry[1]);
+        return (entry = getAddressOfEntry(p_chunkID)) != null && readLock(entry);
+    }
+
+    /**
+     * Get a read lock on a CID
+     *
+     * @param p_entryPosition
+     *          An array of size 2 with the table address and the index in the table
+     * @return False if the chunk is no longer active. True on success.
+     */
+    final boolean readLock(final long[] p_entryPosition) {
+        assert p_entryPosition.length == 2;
+
+        return readLock(p_entryPosition[0], p_entryPosition[1]);
     }
 
     /**
@@ -662,7 +626,20 @@ public final class CIDTable {
         long[] entry;
 
         return (entry = getAddressOfEntry(p_chunkID)) != null &&
-                readUnlock(entry[0], entry[1]);
+                readUnlock(entry);
+    }
+
+    /**
+     * Release a read lock on a CID
+     *
+     * @param p_entryPosition
+     *          An array of size 2 with the table address and the index in the table
+     * @return False if the chunk is no longer active. True on success.
+     */
+    final boolean readUnlock(final long[] p_entryPosition) {
+        assert p_entryPosition.length == 2;
+
+        return readUnlock(p_entryPosition[0], p_entryPosition[1]);
     }
 
     /**
@@ -705,9 +682,20 @@ public final class CIDTable {
     final boolean writeLock(final long p_chunkID) {
         long[] entry;
 
-        return (entry = getAddressOfEntry(p_chunkID)) != null &&
-                writeLock(entry[0], entry[1]);
+        return (entry = getAddressOfEntry(p_chunkID)) != null && writeLock(entry);
+    }
 
+    /**
+     * Get a write lock on a CID
+     *
+     * @param p_entryPosition
+     *          An array of size 2 with the table address and the index in the table
+     * @return False if the chunk is no longer active. True on success.
+     */
+    final boolean writeLock(final long[] p_entryPosition) {
+        assert p_entryPosition.length == 2;
+
+        return writeLock(p_entryPosition[0], p_entryPosition[1]);
     }
 
     /**
@@ -728,8 +716,10 @@ public final class CIDTable {
             if(value == FREE_ENTRY || value == ZOMBIE_ENTRY)
                 return false;
 
-            if((value & WRITE_ACCESS.BITMASK) == WRITE_ACCESS.BITMASK)
+            if((value & WRITE_ACCESS.BITMASK) == WRITE_ACCESS.BITMASK){
+                Thread.yield();
                 continue;
+            }
 
             if(m_rawMemory.compareAndSwapLong(p_tableAddress, m_offset, value, value | WRITE_ACCESS.BITMASK))
                 break;
@@ -737,7 +727,9 @@ public final class CIDTable {
         }
 
         // wait until no present read access
-        while((m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE) & READ_ACCESS.BITMASK) != 0);
+        while((m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE) & READ_ACCESS.BITMASK) != 0){
+            Thread.yield();
+        }
 
         return true;
     }
@@ -752,10 +744,20 @@ public final class CIDTable {
     final boolean writeUnlock(final long p_chunkID) {
 
         long[] entry;
-        return (entry = getAddressOfEntry(p_chunkID)) != null &&
-                writeUnlock(entry[0], entry[1]);
+        return (entry = getAddressOfEntry(p_chunkID)) != null && writeUnlock(entry);
+    }
 
+    /**
+     * Release a write lock on a CID
+     *
+     * @param p_entryPosition
+     *          An array of size 2 with the table address and the index in the table
+     * @return False if the chunk is no longer active. True on success.
+     */
+    final boolean writeUnlock(final long[] p_entryPosition) {
+        assert p_entryPosition.length == 2;
 
+        return writeUnlock(p_entryPosition[0], p_entryPosition[1]);
     }
 
     /**
@@ -940,7 +942,7 @@ public final class CIDTable {
          *
          * @return a free LocalID
          */
-        public long get() {
+        long get() {
             long ret = -1;
 
             if (m_overallCount > 0) {
@@ -1070,7 +1072,7 @@ public final class CIDTable {
                         // Get free LocalID in the next table
                         if (!findFreeLIDs(ADDRESS.get(entry), p_level - 1, i << BITS_PER_LID_LEVEL * p_level)) {
                             // Mark the table as full
-                            entry |= FULL_FLAG;
+                            FULL_FLAG.set(entry, true);
                             writeEntry(p_addressTable, i, entry, LID_TABLE_SIZE);
                         } else {
                             ret = true;
@@ -1187,33 +1189,13 @@ public final class CIDTable {
      * @return
      *          a String with detailed information about the chunk
      */
-    public String level0Entry(long p_chunkID){
+    String level0Entry(long p_chunkID){
         long entry = get(p_chunkID);
         if(entry == 0){
             return String.format("UnknownCID: 0x%016X", p_chunkID);
         }
 
         return String.format("CID(0x%X): %s", p_chunkID, entryData(entry));
-    }
-
-    /**
-     * Debugging: Get a formatted string from a level 0 entry
-     *
-     * @param p_entry
-     *          the entry data
-     * @return
-     *          a String with detailed information about the chunk
-     */
-    static String entryData(final long p_entry){
-        return String.format("address: 0x%X, lf: %d, read: %d, write: %b, moveable: %b, removeable: %b, full: %b",
-                ADDRESS.get(p_entry),
-                LENGTH_FIELD.get(p_entry),
-                READ_ACCESS.get(p_entry),
-                (p_entry & WRITE_ACCESS.BITMASK) == WRITE_ACCESS.BITMASK,
-                (p_entry & STATE_NOT_MOVEABLE.BITMASK) != STATE_NOT_MOVEABLE.BITMASK,
-                (p_entry & STATE_NOT_REMOVEABLE.BITMASK) != 0,
-                (p_entry & FULL_FLAG) == FULL_FLAG);
-
     }
 
 }

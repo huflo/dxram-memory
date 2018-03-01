@@ -9,42 +9,104 @@ import de.hhu.bsinfo.utils.BitMask;
  * @projectname dxram-memory
  */
 public class CIDTableEntry {
+    //Flags vor level 0 entries
+    static final int S_NORMAL = 0;
+    static final int S_NOT_MOVE = 1;
+    static final int S_NOT_REMOVE = 2;
 
     //43 Bit: the address size of a chunk
-    static final CIDTableEntry.Entry ADDRESS = CIDTableEntry.Entry.create(43);
+    static final EntryData ADDRESS = EntryData.create(43);
 
     //1 Bit: Object is bigger than 2^10
-    static final CIDTableEntry.Entry EMBEDDED_LENGTH_FIELD = CIDTableEntry.Entry.create(1);
+    static final EntryBit EMBEDDED_LENGTH_FIELD = EntryBit.create(1);
 
     //2 Bit: If object is bigger 2^10 save size of the length field
-    static final CIDTableEntry.Entry LENGTH_FIELD_SIZE = CIDTableEntry.Entry.create(2);
+    static final EntryData LENGTH_FIELD_SIZE = EntryData.create(2);
 
     //8 Bit: as external length field if object is bigger 2^10
-    static final CIDTableEntry.Entry PARTED_LENGTH_FIELD = CIDTableEntry.Entry.create(8);
+    static final EntryData PARTED_LENGTH_FIELD = EntryData.create(8);
 
     //If object is smaller or equal 2^10 then save no length field.
-    static final CIDTableEntry.Entry LENGTH_FIELD = CIDTableEntry.Entry.CreateCombiened(LENGTH_FIELD_SIZE, PARTED_LENGTH_FIELD);
+    static public final EntryData LENGTH_FIELD = EntryData.combineData(LENGTH_FIELD_SIZE, PARTED_LENGTH_FIELD);
 
     // 7 Bit: Count the parallel read access
-    static final CIDTableEntry.Entry READ_ACCESS = CIDTableEntry.Entry.create(7);
+    static final EntryData READ_ACCESS = EntryData.create(7);
     static final long READ_INCREMENT = 1L << READ_ACCESS.OFFSET;
 
     // 1 Bit: Mark a wanted write access
-    static final CIDTableEntry.Entry WRITE_ACCESS = CIDTableEntry.Entry.create(1);
+    static final EntryBit WRITE_ACCESS = EntryBit.create(1);
 
     // 1 Bit: no remove allowed (e.g. to purpose a fast path)
-    static final CIDTableEntry.Entry STATE_NOT_REMOVEABLE = CIDTableEntry.Entry.create(1);
+    static final EntryBit STATE_NOT_REMOVEABLE = EntryBit.create(1);
 
     // 1 Bit: no move allowed (e.g. to purpose defragmentation)
-    static final CIDTableEntry.Entry STATE_NOT_MOVEABLE = CIDTableEntry.Entry.create(1);
+    static final EntryBit STATE_NOT_MOVEABLE = EntryBit.create(1);
 
     //not moveable implies not removeable so we can use this combination for a full list or a unused cid
-    static final long FULL_FLAG = STATE_NOT_MOVEABLE.BITMASK | STATE_NOT_REMOVEABLE.BITMASK;
+    static final EntryBit FULL_FLAG = EntryBit.combineData(STATE_NOT_MOVEABLE, STATE_NOT_REMOVEABLE);
+
+    /**
+     * Create a normal level 0 entry
+     *
+     * @param p_address
+     *          Address on the heap
+     * @param p_size
+     *          Size of the chunk
+     * @return A generated normal entry for the CID Table
+     */
+    static long createEntry(final long p_address, final long p_size){
+        return createEntry(p_address, p_size, S_NORMAL);
+    }
+
+    /**
+     * Create a level 0 entry
+     *
+     * @param p_addressChunk
+     *          Address on the heap
+     * @param p_size
+     *          Size of the chunk
+     * @param p_state
+     *          State of the Chunk use S_NORMAL, S_NOT_MOVEABLE or S_NOT_REMOVEABLE
+     * @return A generated entry for the CID Table
+     */
+    private static long createEntry(final long p_addressChunk, final long p_size, int p_state){
+        long entry = 0;
+
+        //write address
+        entry = ADDRESS.set(entry, p_addressChunk);
+        entry = LENGTH_FIELD.set(entry, p_size - 1);
+        if(p_state != S_NORMAL){
+            entry = STATE_NOT_REMOVEABLE.set(entry, p_state == S_NOT_REMOVE);
+            entry = STATE_NOT_MOVEABLE.set(entry, p_state == S_NOT_MOVE);
+        }
+
+        return entry;
+    }
+
+    /**
+     * Debugging: Get a formatted string from a level 0 entry
+     *
+     * @param p_entry
+     *          the entry data
+     * @return
+     *          a String with detailed information about the chunk
+     */
+    static String entryData(final long p_entry){
+        return String.format("address: 0x%X, lf: %d, read: %d, write: %b, moveable: %b, removeable: %b, full: %b",
+                ADDRESS.get(p_entry),
+                LENGTH_FIELD.get(p_entry),
+                READ_ACCESS.get(p_entry),
+                WRITE_ACCESS.get(p_entry),
+                !STATE_NOT_MOVEABLE.get(p_entry),
+                !STATE_NOT_REMOVEABLE.get(p_entry),
+                FULL_FLAG.get(p_entry));
+
+    }
 
     /**
      * Handle bit masks and data offset for level 0 entries
      */
-    public static final class Entry {
+    private static class Entry {
         private static BitMask bm = new BitMask(Long.SIZE);
 
         public final long BITMASK;
@@ -66,21 +128,26 @@ public class CIDTableEntry {
             OFFSET = (byte) Math.min(e1.OFFSET, e2.OFFSET);
             BITMASK = e1.BITMASK | e2.BITMASK;
             SIZE = (byte) (e1.SIZE + e2.SIZE);
-
         }
 
-        /**
-         * Create a bit partition for a level 0 entry
-         *
-         * @param neededBits number of bits the entry need
-         * @return a Entry Object
-         */
-        private static Entry create(final int neededBits){
-            return new Entry((byte)neededBits);
+    }
+
+    public static final class EntryData extends Entry {
+
+        private EntryData(final byte neededBytes){
+            super(neededBytes);
         }
 
-        private static Entry CreateCombiened(Entry e1, Entry e2){
-            return new Entry(e1,e2);
+        private EntryData(Entry e1, Entry e2){
+            super(e1, e2);
+        }
+
+        private static EntryData create(final int neededBits){
+            return new EntryData((byte) neededBits);
+        }
+
+        private static EntryData combineData(Entry e1, Entry e2){
+            return new EntryData(e1, e2);
         }
 
         /**
@@ -92,5 +159,48 @@ public class CIDTableEntry {
         public final long get(final long p_tableEntry){
             return (p_tableEntry & BITMASK) >> OFFSET;
         }
+
+        public final long set(final long p_tableEntry, final long value){
+            return (p_tableEntry & ~BITMASK) | ((value << OFFSET) & BITMASK);
+        }
+    }
+
+    public static final class EntryBit extends Entry {
+
+        /**
+         * Constructor
+         *
+         * @param neededBits Needed bit for the entry
+         */
+        private EntryBit(byte neededBits) {
+            super(neededBits);
+        }
+
+        private EntryBit(Entry e1, Entry e2) {
+            super(e1, e2);
+        }
+
+        private static EntryBit create(final int neededBits){
+            return new EntryBit((byte) neededBits);
+        }
+
+        private static EntryBit combineData(Entry e1, Entry e2){
+            return new EntryBit(e1, e2);
+        }
+
+        /**
+         * Get the saved data from a entry
+         *
+         * @param p_tableEntry the level 0 table entry
+         * @return the saved data
+         */
+        public final boolean get(final long p_tableEntry){
+            return (p_tableEntry & BITMASK) == BITMASK;
+        }
+
+        public final long set(final long p_tableEntry, final boolean value){
+            return (value) ? (p_tableEntry | BITMASK):(p_tableEntry & ~BITMASK);
+        }
+
     }
 }

@@ -18,7 +18,8 @@ import static de.hhu.bsinfo.dxram.mem.SmallObjectHeap.*;
  * @author Florian Hucke (florian.hucke@hhu.de) on 21.02.18
  * @projectname dxram-memory
  */
-public final class MemoryManagerAnalyzer {
+@SuppressWarnings({"SameParameterValue", "FieldCanBeLocal"})
+final class MemoryManagerAnalyzer {
     private static final Logger LOGGER = LogManager.getFormatterLogger(MemoryManagerAnalyzer.class.getSimpleName());
 
     private final SmallObjectHeap m_heap;
@@ -67,7 +68,7 @@ public final class MemoryManagerAnalyzer {
         m_managementTables = getAllManagementTables();
         m_managementTables.sort(Comparator.comparingLong(CIDTableEntry.ADDRESS::get));
 
-        LOGGER.info(String.format("Colleted data. Found: managed free blocks: %d, data blocks: %d, table: %d",
+        LOGGER.info(String.format("Collected data. Found: managed free blocks: %d, data blocks: %d, table: %d",
                 m_freeBlocks.size(), m_dataBlocks.size(), m_managementTables.size()));
 
     }
@@ -209,7 +210,7 @@ public final class MemoryManagerAnalyzer {
         for (long i = 0; i < m_table.getNextLocalIDCounter(); i++) {
             entry = m_table.get(i);
 
-            if ( entry == FREE_ENTRY || entry == ZOMBIE_ENTRY || (entry & FULL_FLAG) == FULL_FLAG ){
+            if ( entry == FREE_ENTRY || entry == ZOMBIE_ENTRY || FULL_FLAG.get(entry) ){
                 continue;
             }
 
@@ -410,7 +411,7 @@ public final class MemoryManagerAnalyzer {
 
             if(entry == 0) freeEntries++;
             else if(entry == ZOMBIE_ENTRY) zombieEntries++;
-            else if((entry & FULL_FLAG) != 0) fullEntries++;
+            else if(FULL_FLAG.get(entry)) fullEntries++;
             else countActive++;
         }
 
