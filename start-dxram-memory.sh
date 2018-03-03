@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/usr/bin/env bash
 
 ## Script information
 # author: Florian Hucke, florian(dot)hucke(at)hhu(dot)de
