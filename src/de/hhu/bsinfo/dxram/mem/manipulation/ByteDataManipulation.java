@@ -6,6 +6,7 @@ package de.hhu.bsinfo.dxram.mem.manipulation;
  * @author Florian Hucke (florian.hucke@hhu.de) on 25.02.18
  * @projectname dxram-memory
  */
+@FunctionalInterface
 public interface ByteDataManipulation {
 
     /**
