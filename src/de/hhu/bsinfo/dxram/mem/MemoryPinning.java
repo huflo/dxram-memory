@@ -34,7 +34,7 @@ public class MemoryPinning {
         long[] entryPosition = cidTable.getAddressOfEntry(chunkID);
 
         if(cidTable.setState(entryPosition, STATE_NOT_MOVEABLE, true)){
-            return WRITE_ACCESS.set(READ_ACCESS.set(cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE), 0), false);
+            return WRITE_ACCESS.set(READ_ACCESS.set(cidTable.get(entryPosition), 0), false);
         }
 
         return 0;

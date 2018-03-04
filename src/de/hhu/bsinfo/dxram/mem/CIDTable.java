@@ -254,105 +254,41 @@ final class CIDTable {
      * @return the entry. 0 for invalid/unused.
      */
     long get(final long p_chunkID) {
-        long index;
-        long entry;
+        return get(getAddressOfEntry(p_chunkID));
 
-        int level = 0;
-        long addressTable;
-        boolean putCache = false;
-
-        // try to jump to table level 0 using the cache
-        addressTable = m_cache[(int) Thread.currentThread().getId()].getTableLevel0(p_chunkID);
-        if (addressTable == -1) {
-            level = LID_TABLE_LEVELS;
-            addressTable = m_addressTableDirectory;
-            putCache = true;
-        }
-
-        do {
-            if (level == LID_TABLE_LEVELS) {
-                index = p_chunkID >> BITS_PER_LID_LEVEL * level & NID_LEVEL_BITMASK;
-            } else {
-                index = p_chunkID >> BITS_PER_LID_LEVEL * level & LID_LEVEL_BITMASK;
-            }
-
-            if (level > 0) {
-                entry = ADDRESS.get(readEntry(addressTable, index, LID_TABLE_SIZE));
-
-                if (entry <= 0) {
-                    break;
-                }
-
-                // move on to next table
-                addressTable = entry;
-            } else {
-                // add table 0 address to cache
-                if (putCache) {
-                    m_cache[(int) Thread.currentThread().getId()].putTableLevel0(p_chunkID, addressTable);
-                }
-
-                // get entry to chunk from table level 0
-                return readEntry(addressTable, index, LID_TABLE_SIZE);
-            }
-
-            level--;
-        } while (level >= 0);
-
-        return 0;
     }
 
     /**
-     * Get the table address and the index of a CID
+     * Gets an entry of the level 0 table
      *
-     * @param p_chunkID the CID we want to know the memory address
-     * @return a long array with the table address and the index of the entry or null if there is no suitable CID entry
+     * @param p_entryPosition
+     *     address of the level 0 table with offset
+     * @return the entry. 0 for invalid/unused.
      */
-    long[] getAddressOfEntry(long p_chunkID){
-        long index;
-        long entry;
-
-        int level = 0;
-        long addressTable;
-        boolean putCache = false;
-
-        // try to jump to table level 0 using the cache
-        addressTable = m_cache[(int) Thread.currentThread().getId()].getTableLevel0(p_chunkID);
-        if (addressTable == -1) {
-            level = LID_TABLE_LEVELS;
-            addressTable = m_addressTableDirectory;
-            putCache = true;
+    long get(final long[] p_entryPosition){
+        if(p_entryPosition == null){
+            return 0;
+        } else {
+            return readEntry(p_entryPosition[0], p_entryPosition[1], LID_TABLE_SIZE);
         }
+    }
 
-        do {
-            if (level == LID_TABLE_LEVELS) {
-                index = p_chunkID >> BITS_PER_LID_LEVEL * level & NID_LEVEL_BITMASK;
-            } else {
-                index = p_chunkID >> BITS_PER_LID_LEVEL * level & LID_LEVEL_BITMASK;
-            }
-
-            if (level > 0) {
-                entry = readEntry(addressTable, index, LID_TABLE_SIZE);
-
-                if (entry == ZOMBIE_ENTRY || entry == FREE_ENTRY) {
-                    break;
-                }
-
-                // move on to next table
-                addressTable = ADDRESS.get(entry);
-            } else {
-                // add table 0 address to cache
-                if (putCache) {
-                    m_cache[(int) Thread.currentThread().getId()].putTableLevel0(p_chunkID, addressTable);
-                }
-
-                // get address of the entry
-                return new long[]{addressTable, index};
-            }
-
-            level--;
-        } while (level >= 0);
-
-        return null;
+    /**
+     * Sets an entry of the level 0 table
+     *
+     * @param p_entryPosition
+     *     address of the level 0 table with offset
+     * @param p_chunkEntry
+     *     the coded entry of the chunk with the address, a 10 bit space of a length field and different states
+     * @return True if successful, false if allocation of a new table failed, out of memory
+     */
+    boolean set(final long[] p_entryPosition, final long p_chunkEntry){
+        if(p_entryPosition == null || p_entryPosition.length != 2)
+            return false;
+        else {
+            writeEntry(p_entryPosition[0], p_entryPosition[1], p_chunkEntry, LID_TABLE_SIZE);
+            return true;
+        }
     }
 
     /**
@@ -365,64 +301,11 @@ final class CIDTable {
      * @return True if successful, false if allocation of a new table failed, out of memory
      */
     boolean set(final long p_chunkID, final long p_chunkEntry) {
-        long index;
-        long entry;
-        long tableSize = NID_TABLE_SIZE;
+        return set(getAddressOfEntry(p_chunkID), p_chunkEntry);
+    }
 
-        int level = 0;
-        long addressTable;
-        boolean putCache = false;
-
-        // try to jump to table level 0 using the cache
-        addressTable = m_cache[(int) Thread.currentThread().getId()].getTableLevel0(p_chunkID);
-        if (addressTable == -1) {
-            level = LID_TABLE_LEVELS;
-            addressTable = m_addressTableDirectory;
-            putCache = true;
-        }
-
-        do {
-            if (level == LID_TABLE_LEVELS) {
-                index = p_chunkID >> BITS_PER_LID_LEVEL * level & NID_LEVEL_BITMASK;
-            } else {
-                index = p_chunkID >> BITS_PER_LID_LEVEL * level & LID_LEVEL_BITMASK;
-                tableSize = LID_TABLE_SIZE;
-            }
-
-            if (level > 0) {
-
-                // Read table entry
-                entry = readEntry(addressTable, index, tableSize);
-                if (entry == 0) {
-                    entry = createLIDTable();
-                    if (entry == -1) {
-                        return false;
-                    }
-                    writeEntry(addressTable, index, entry, tableSize);
-                }
-
-                // move on to next table
-                addressTable = ADDRESS.get(entry);
-            } else {
-                // Set the level 0 entry (address to active chunk)
-                // valid and active entry with internal 10 bit for a length field
-                // or  part of it
-                entry = p_chunkEntry;
-
-                writeEntry(addressTable, index, entry, tableSize);
-
-                // add table address to table 0 to cache
-                if (putCache) {
-                    m_cache[(int) Thread.currentThread().getId()].putTableLevel0(p_chunkID, addressTable);
-                }
-
-                return true;
-            }
-
-            level--;
-        } while (level >= 0);
-
-        return true;
+    boolean setAndCreate(final long p_chunkID, final long p_chunkEntry){
+        return set(getAddressOfEntryCreate(p_chunkID), p_chunkEntry);
     }
 
     /**
@@ -502,6 +385,118 @@ final class CIDTable {
     }
 
     /**
+     * Get the table address and the index of a CID
+     *
+     * @param p_chunkID the CID we want to know the memory address
+     * @return a long array with the table address and the index of the entry or null if there is no suitable CID entry
+     */
+    long[] getAddressOfEntry(long p_chunkID){
+        long index;
+        long entry;
+
+        int level = 0;
+        long addressTable;
+        boolean putCache = false;
+
+        // try to jump to table level 0 using the cache
+        addressTable = m_cache[(int) Thread.currentThread().getId()].getTableLevel0(p_chunkID);
+        if (addressTable == -1) {
+            level = LID_TABLE_LEVELS;
+            addressTable = m_addressTableDirectory;
+            putCache = true;
+        }
+
+        do {
+            if (level == LID_TABLE_LEVELS) {
+                index = p_chunkID >> BITS_PER_LID_LEVEL * level & NID_LEVEL_BITMASK;
+            } else {
+                index = p_chunkID >> BITS_PER_LID_LEVEL * level & LID_LEVEL_BITMASK;
+            }
+
+            if (level > 0) {
+                entry = readEntry(addressTable, index, LID_TABLE_SIZE);
+
+                if (entry == ZOMBIE_ENTRY || entry == FREE_ENTRY) {
+                    break;
+                }
+
+                // move on to next table
+                addressTable = ADDRESS.get(entry);
+            } else {
+                // add table 0 address to cache
+                if (putCache) {
+                    m_cache[(int) Thread.currentThread().getId()].putTableLevel0(p_chunkID, addressTable);
+                }
+
+                // get address of the entry
+                return new long[]{addressTable, index};
+            }
+
+            level--;
+        } while (level >= 0);
+
+        return null;
+    }
+
+    /**
+     * Get the table address and the index of a CID. If a table does not exist, create it.
+     *
+     * @param p_chunkID the CID we want to know the memory address
+     * @return a long array with the table address and the index of the entry or null if there is no suitable CID entry
+     */
+    long[] getAddressOfEntryCreate(long p_chunkID){
+        long index;
+        long entry;
+
+        int level = 0;
+        long addressTable;
+        boolean putCache = false;
+
+        // try to jump to table level 0 using the cache
+        addressTable = m_cache[(int) Thread.currentThread().getId()].getTableLevel0(p_chunkID);
+        if (addressTable == -1) {
+            level = LID_TABLE_LEVELS;
+            addressTable = m_addressTableDirectory;
+            putCache = true;
+        }
+
+        do {
+            if (level == LID_TABLE_LEVELS) {
+                index = p_chunkID >> BITS_PER_LID_LEVEL * level & NID_LEVEL_BITMASK;
+            } else {
+                index = p_chunkID >> BITS_PER_LID_LEVEL * level & LID_LEVEL_BITMASK;
+            }
+
+            if (level > 0) {
+                entry = readEntry(addressTable, index, LID_TABLE_SIZE);
+
+                if (entry == 0) {
+                    entry = createLIDTable();
+                    if (entry == -1) {
+                        return null;
+                    }
+                    writeEntry(addressTable, index, entry, LID_TABLE_SIZE);
+                }
+
+                // move on to next table
+                addressTable = ADDRESS.get(entry);
+            } else {
+                // add table 0 address to cache
+                if (putCache) {
+                    m_cache[(int) Thread.currentThread().getId()].putTableLevel0(p_chunkID, addressTable);
+                }
+
+                // get address of the entry
+                return new long[]{addressTable, index};
+            }
+
+            level--;
+        } while (level >= 0);
+
+        return null;
+    }
+
+    /**
      * Disengages the CIDTable
      */
     void disengage() {
@@ -525,6 +520,8 @@ final class CIDTable {
 
     /**
      * Reads a table entry
+     *
+     * (Need to be package-private because of the analyzer)
      *
      * @param p_addressTable
      *     the table
@@ -733,7 +730,6 @@ final class CIDTable {
 
         return true;
     }
-
 
     /**
      * Release a read lock on a CID
@@ -1304,6 +1300,20 @@ final class CIDTable {
         }
 
         return String.format("CID(0x%X): %s", p_chunkID, entryData(entry));
+    }
+
+    /**
+     * Debugging: Get a formatted string from a level 0 entry with CID
+     *
+     * @param p_entryPosition
+     *     address of the level 0 table with offset
+     * @return
+     *          a String with detailed information about the chunk
+     */
+    String level0Entry(long[] p_entryPosition){
+        long entry = get(p_entryPosition);
+
+        return String.format("%s", entryData(entry));
     }
 
 }

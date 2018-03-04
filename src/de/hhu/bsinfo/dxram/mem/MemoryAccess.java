@@ -78,7 +78,7 @@ public class MemoryAccess {
                 //->SOP_GET.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                entry = m_cidTable.get(entryPosition);
                 address = ADDRESS.get(entry);
                 size = LENGTH_FIELD.get(entry) + 1;
                 deleted = FULL_FLAG.get(entry);
@@ -146,7 +146,7 @@ public class MemoryAccess {
                 //->SOP_GET.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                entry = m_cidTable.get(entryPosition);
                 address = ADDRESS.get(entry);
                 size = LENGTH_FIELD.get(entry) + 1;
                 deleted = FULL_FLAG.get(entry);
@@ -210,7 +210,7 @@ public class MemoryAccess {
                 //->SOP_GET.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                entry = m_cidTable.get(entryPosition);
                 address = ADDRESS.get(entry);
                 size = LENGTH_FIELD.get(entry) + 1;
                 deleted = FULL_FLAG.get(entry);
@@ -278,7 +278,7 @@ public class MemoryAccess {
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                entry = m_cidTable.get(entryPosition);
                 address = ADDRESS.get(entry);
                 size = LENGTH_FIELD.get(entry) + 1;
                 deleted = FULL_FLAG.get(entry);
@@ -368,7 +368,7 @@ public class MemoryAccess {
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                entry = m_cidTable.get(entryPosition);
                 address = ADDRESS.get(entry);
                 size = LENGTH_FIELD.get(entry) + 1;
                 deleted = FULL_FLAG.get(entry);
@@ -433,7 +433,7 @@ public class MemoryAccess {
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                entry = m_cidTable.get(entryPosition);
                 address = ADDRESS.get(entry);
                 size = LENGTH_FIELD.get(entry) + 1;
                 deleted = FULL_FLAG.get(entry);
@@ -487,7 +487,7 @@ public class MemoryAccess {
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                entry = m_cidTable.get(entryPosition);
                 address = ADDRESS.get(entry);
                 size = LENGTH_FIELD.get(entry) + 1;
                 deleted = FULL_FLAG.get(entry);
@@ -562,7 +562,7 @@ public class MemoryAccess {
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                entry = m_cidTable.get(entryPosition);
                 address = ADDRESS.get(entry);
                 size = LENGTH_FIELD.get(entry) + 1;
                 deleted = FULL_FLAG.get(entry);
@@ -623,7 +623,7 @@ public class MemoryAccess {
                     //->SOP_GET.enter();
                     // #endif /* STATISTICS */
 
-                    entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                    entry = m_cidTable.get(entryPosition);
                     address = ADDRESS.get(entry);
                     size = LENGTH_FIELD.get(entry) + 1;
                     deleted = FULL_FLAG.get(entry);
