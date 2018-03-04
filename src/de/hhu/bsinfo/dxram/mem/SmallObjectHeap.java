@@ -1469,7 +1469,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
      *         Address to check if within memory.
      * @return Dummy return for assert
      */
-    private boolean assertMemoryBounds(final long p_address) {
+    boolean assertMemoryBounds(final long p_address) {
         if (p_address < 0 || p_address > m_status.m_size) {
             throw new MemoryRuntimeException("Address " + p_address + " is not within memory: " + this);
         }
@@ -1486,7 +1486,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
      *         Number of bytes starting at address.
      * @return Dummy return for assert
      */
-    private boolean assertMemoryBounds(final long p_address, final long p_length) {
+    boolean assertMemoryBounds(final long p_address, final long p_length) {
         if (p_address < 0 || p_address > m_status.m_size || p_address + p_length < 0 || p_address + p_length > m_status.m_size) {
             throw new MemoryRuntimeException("Address " + p_address + " with length " + p_length + "is not within memory: " + this);
         }

@@ -22,6 +22,7 @@ public class MemoryManager {
     final MemoryDirectAccess memoryDirectAccess;
     final MemoryInformation memoryInformation;
     final MemoryManagement memoryManagement;
+    final MemoryPinning memoryPinning;
 
     public MemoryManager(final short p_nodeID, final long p_heapSize, final int p_maxBlockSize) {
         smallObjectHeap = new SmallObjectHeap(new StorageUnsafeMemory(), p_heapSize, p_maxBlockSize);
@@ -31,6 +32,7 @@ public class MemoryManager {
         memoryDirectAccess = new MemoryDirectAccess(this);
         memoryInformation = new MemoryInformation(this);
         memoryManagement = new MemoryManagement(this);
+        memoryPinning = new MemoryPinning(this);
 
         memoryInformation.numActiveChunks = 0;
         memoryInformation.totalActiveChunkMemory = 0;
@@ -145,10 +147,51 @@ public class MemoryManager {
      *         A Interface to manipulate the data of the chunk
      * @return True if putting the data was successful, false if no chunk with the specified id exists
      */
-    //TODO testing
     boolean modify(final long p_chunkID, ByteDataManipulation byteDataManipulation) {
         return memoryAccess.modify(p_chunkID, byteDataManipulation);
     }
+
+    //MemoryPinning
+    /**
+     * Pin a chunk for direct access
+     *
+     * @param chunkID Chunk ID to pin
+     * @return The CIDTable entry
+     */
+    public long pinChunk(final long chunkID){
+        return memoryPinning.pinChunk(chunkID);
+    }
+
+    /**
+     * Unpin a Chunks (slow operation need a DFS over all CIDTable tables)
+     *
+     * @param cidTableEntry CIDTable entry.
+     * @return The corresponding chunk ID or -1 if no suitable chunk ID was found
+     */
+    public long unpinChunk(final long cidTableEntry){
+        return memoryPinning.unpinChunk(cidTableEntry);
+    }
+
+    /**
+     * Get the data for a entry
+     *
+     * @param cidTableEntry CIDTable entry
+     * @return Chunk data
+     */
+    public byte[] getPinned(final long cidTableEntry){
+        return memoryPinning.get(cidTableEntry);
+    }
+
+    /**
+     * Put data to a entry
+     *
+     * @param cidTableEntry Entry
+     * @param data Data to put
+     */
+    public void putPinned(final long cidTableEntry, final byte[] data){
+        memoryPinning.put(cidTableEntry, data);
+    }
+
 
     //MemoryManagement
 

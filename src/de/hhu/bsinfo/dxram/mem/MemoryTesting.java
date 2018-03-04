@@ -66,6 +66,15 @@ public final class MemoryTesting {
     }
 
     /**
+     * delete all chunks
+     */
+    public final void resetHeap(){
+        for (int i = 0; i <= m.memoryInformation.getHighestUsedLocalID(); i++) {
+            m.remove(i, false);
+        }
+    }
+
+    /**
      * Destroy the testing instance
      */
     public final void destroy(){
@@ -157,7 +166,7 @@ public final class MemoryTesting {
     /**
      * Reset all counter, but keep the chunks
      */
-    public final void resetHeap(){
+    public final void reInitHeap(){
         //reset values
         for (int i = 0; i < nChunks; i++) {
             m.put(cids[i], FastByteUtils.longToBytes(0));
@@ -312,7 +321,6 @@ public final class MemoryTesting {
         stopwatch.start();
         execNOperationsRunnables(nThreads, nThreads, nOperations, r);
         stopwatch.stop();
-
         TestingMeasurements.add(nThreads, stopwatch.toString());
 
         if(testData){
@@ -336,6 +344,42 @@ public final class MemoryTesting {
         }
 
         LOGGER.info("Run: %d => %s", TestingMeasurements.l.size(), TestingMeasurements.l.getLast());
+    }
+
+    /**
+     * Test if pinning is functional
+     *
+     * @param nChunks Chunks we want to test.
+     */
+    public void pinningFunctional(int nChunks){
+        int blockSize = 50;
+        byte[] data = new byte[blockSize];
+
+        for (int i = 0; i < data.length; i++) {
+            data[i] = (byte) i;
+        }
+
+        long[] cids = m.createMulti(50,nChunks);
+        long[] entry = new long[nChunks];
+
+        for (int i = 0; i < nChunks; i++) {
+            entry[i] = m.pinChunk(cids[i]); //Pinning ok?
+            m.remove(cids[i], false); //Flag ok?
+
+            m.putPinned(entry[i], data); //put ok?
+            byte[] testRead = m.getPinned(entry[i]); //get ok?
+            for (int j = 0; j < data.length; j++) { //check if really ok?
+                if(data[j] != testRead[j]) {
+                    System.exit(-1);
+                }
+            }
+
+            if(cids[i] != m.unpinChunk(entry[i])){ //do unpin
+                System.out.println("DFS error CID: " + cids[i]);
+                System.exit(-1);
+            }
+            m.remove(cids[i], true); //flag ok?
+        }
     }
 
     /**

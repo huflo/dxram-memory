@@ -898,6 +898,56 @@ final class CIDTable {
         }
     }
 
+
+    /**
+     * Do a reverse search form a entry to a chunk id
+     *
+     * @param p_cidTableEntry The entry for which the CID is searched
+     * @return The chunk id or 0 if no suitable chunk id was found
+     */
+    long reverseSearch(final long p_cidTableEntry){
+        return new ReverseSearch(p_cidTableEntry).getCID();
+    }
+
+    /**
+     * Update the state of a CIDTable entry
+     *
+     * @param chunkID Chunk ID.
+     * @param state State to change.
+     * @param newState New value to set .
+     * @return True if state is set, false if the chunk don't exist.
+     */
+    boolean setState(final long chunkID, CIDTableEntry.EntryBit state, final boolean newState){
+        long[] entryPosition = getAddressOfEntry(chunkID);
+
+        return setState(entryPosition, state, newState);
+    }
+
+    /**
+     * Update the state of a CIDTable entry
+     *
+     * @param entryPosition The position of the entry(long array: {address of table, index in table}
+     * @param state State to change.
+     * @param newState New value to set .
+     * @return True if state is set, false if the chunk don't exist.
+     */
+    boolean setState(final long[] entryPosition, CIDTableEntry.EntryBit state, final boolean newState){
+        assert entryPosition != null;
+
+        long entry;
+        while (true) {
+            entry = m_rawMemory.readLong(entryPosition[0], entryPosition[1] * ENTRY_SIZE, LID_TABLE_SIZE);
+
+            if(entry == FREE_ENTRY && entry == ZOMBIE_ENTRY)
+                return false;
+
+            if(m_rawMemory.compareAndSwapLong(entryPosition[0], entryPosition[1] * ENTRY_SIZE, entry, state.set(entry, newState)))
+                break;
+        }
+
+        return true;
+    }
+
     /**
      * Stores free LocalIDs
      *
@@ -1176,6 +1226,64 @@ final class CIDTable {
                     m_tableLevel0Addr[i] = -1;
                     m_chunkIDs[i] = -1;
                     break;
+                }
+            }
+        }
+    }
+
+    /**
+     * Search a chunk ID for a address, with DFS
+     */
+    private final class ReverseSearch {
+        final long m_address;
+        long chunkID = -1;
+        private boolean found;
+
+        /**
+         * Constructor
+         *
+         * @param p_entry Entry for which the CID is searched.
+         */
+        private ReverseSearch(final long p_entry){
+            m_address = ADDRESS.get(p_entry);
+            found = false;
+        }
+
+        /**
+         * Search a chunk ID with DFS
+         *
+         * @return the matching chunk ID or -1 if no suitable chunk id was found
+         */
+        private long getCID(){
+            for (int i = 0; i < ENTRIES_FOR_NID_LEVEL && !found; i++) {
+                long entry = readEntry(m_addressTableDirectory, i, NID_TABLE_SIZE);
+                if(entry != FREE_ENTRY && entry != ZOMBIE_ENTRY)
+                    getCID(LID_TABLE_LEVELS-1, ADDRESS.get(entry), i);
+            }
+
+            return chunkID;
+        }
+
+        /**
+         * Recursive depth first search for a chunk ID
+         *
+         * @param level LID level.
+         * @param tableAddress Address of the table.
+         * @param chunkID Current known chunk ID part.
+         */
+        private void getCID(final int level, final long tableAddress, final long chunkID){
+            long entry;
+
+            for (int i = 0; i < ENTRIES_PER_LID_LEVEL && !found; i++) {
+                entry = readEntry(tableAddress, i, LID_TABLE_SIZE);
+                if(entry != FREE_ENTRY && entry != ZOMBIE_ENTRY) {
+                    if (level > 0) {
+                        long address = ADDRESS.get(entry);
+                        getCID(level - 1, address, (chunkID << BITS_PER_LID_LEVEL) | i);
+                    } else if (ADDRESS.get(entry) == m_address) {
+                        found = true;
+                        this.chunkID = (chunkID << BITS_PER_LID_LEVEL) | i;
+                    }
                 }
             }
         }
