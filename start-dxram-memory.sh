@@ -24,10 +24,8 @@ CLASSPATH=$LIBS:$BINARY
 
 MAIN_CLASS=de.hhu.bsinfo.DXRAMMemory
 
-java \
-    -Dlog4j.configurationFile=$CONF_DIR/log4j.xml \
-    -Ddxram.config=$CONF_DIR/dxram.json \
-    -cp $CLASSPATH $MAIN_CLASS \
-    -ea \
-    -jar $BINARY #> /dev/null 2>&1
-
+java -ea\
+    -Dlog4j.configurationFile=$CONF_DIR/log4j.xml\
+    -Ddxram.config=$CONF_DIR/dxram.json\
+    -cp $CLASSPATH $MAIN_CLASS\
+    $@ #> /dev/null 2>&1
