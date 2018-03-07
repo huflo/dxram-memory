@@ -9,7 +9,7 @@ import de.hhu.bsinfo.dxram.data.DataStructure;
  * @projectname dxram-memory
  */
 @FunctionalInterface
-public interface DataStructureManipulation {
+public interface DataStructureManipulation <T extends DataStructure>{
 
     /**
      * Method to manipulate data
@@ -17,5 +17,5 @@ public interface DataStructureManipulation {
      * @param oldData Data to be manipulated
      * @return Manipulated data
      */
-    DataStructure getNewData(DataStructure oldData);
+    T getNewData(T oldData);
 }
