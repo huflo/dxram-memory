@@ -32,6 +32,7 @@ import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.*;
  * @author Stefan Nothaas, stefan.nothaas@hhu.de, 11.11.2015
  * @author Florian Hucke, florian.hucke@hhu.de, 06.02.2018
  */
+@SuppressWarnings("unused")
 final class CIDTable {
     private static final byte ENTRY_SIZE = 8;
     static final byte LID_TABLE_LEVELS = 4;
@@ -350,7 +351,7 @@ final class CIDTable {
                 //We don't delete Table so only on level 1 we can have a change
                 if (FULL_FLAG.get(entry) && level == 1) {
                     // Delete full flag
-                    FULL_FLAG.set(entry, false);
+                    entry = FULL_FLAG.set(entry, false);
                     writeEntry(addressTable, index, entry, tableSize);
                 }
 
@@ -468,11 +469,12 @@ final class CIDTable {
             }
 
             if (level > 0) {
+
                 entry = readEntry(addressTable, index, LID_TABLE_SIZE);
 
                 if (entry == 0) {
                     entry = createLIDTable();
-                    if (entry == -1) {
+                    if (entry == SmallObjectHeap.INVALID_ADDRESS) {
                         return null;
                     }
                     writeEntry(addressTable, index, entry, LID_TABLE_SIZE);
@@ -702,7 +704,7 @@ final class CIDTable {
      * @param p_index row in the table
      * @return False if the chunk is no longer active. True on success.
      */
-    final boolean writeLock(final long p_tableAddress, final long p_index){
+    private boolean writeLock(final long p_tableAddress, final long p_index){
         long m_offset = p_index * ENTRY_SIZE;
         long value;
 
@@ -1118,7 +1120,7 @@ final class CIDTable {
                         // Get free LocalID in the next table
                         if (!findFreeLIDs(ADDRESS.get(entry), p_level - 1, i << BITS_PER_LID_LEVEL * p_level)) {
                             // Mark the table as full
-                            FULL_FLAG.set(entry, true);
+                            entry = FULL_FLAG.set(entry, true);
                             writeEntry(p_addressTable, i, entry, LID_TABLE_SIZE);
                         } else {
                             ret = true;
@@ -1284,36 +1286,4 @@ final class CIDTable {
             }
         }
     }
-
-    /**
-     * Debugging: Get a formatted string from a level 0 entry with CID
-     *
-     * @param p_chunkID
-     *          the chunk id of the entry
-     * @return
-     *          a String with detailed information about the chunk
-     */
-    String level0Entry(long p_chunkID){
-        long entry = get(p_chunkID);
-        if(entry == 0){
-            return String.format("UnknownCID: 0x%016X", p_chunkID);
-        }
-
-        return String.format("CID(0x%X): %s", p_chunkID, entryData(entry));
-    }
-
-    /**
-     * Debugging: Get a formatted string from a level 0 entry with CID
-     *
-     * @param p_entryPosition
-     *     address of the level 0 table with offset
-     * @return
-     *          a String with detailed information about the chunk
-     */
-    String level0Entry(long[] p_entryPosition){
-        long entry = get(p_entryPosition);
-
-        return String.format("%s", entryData(entry));
-    }
-
 }
