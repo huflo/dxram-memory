@@ -19,11 +19,12 @@ import static de.hhu.bsinfo.dxram.mem.SmallObjectHeap.*;
  * @projectname dxram-memory
  */
 @SuppressWarnings({"SameParameterValue", "FieldCanBeLocal"})
-final class MemoryManagerAnalyzer {
+final public class MemoryManagerAnalyzer {
     private static final Logger LOGGER = LogManager.getFormatterLogger(MemoryManagerAnalyzer.class.getSimpleName());
 
     private final SmallObjectHeap m_heap;
     private final CIDTable m_table;
+    private final MemoryInformation m_info;
     private final boolean m_quiet;
     private final boolean m_dumpOnError;
 
@@ -43,16 +44,17 @@ final class MemoryManagerAnalyzer {
     /**
      * Constructor
      *
-     * @param p_cidTable CIDTable instance
-     * @param p_heap SmallObjectHeap instance
-     * @param p_quite Be quiet. If true print only the first occurring error
+     * @param memoryManager The central unit which manages all memory accesses
+     * @param p_quiet Be quiet. If true print only the first occurring error
      * @param p_dumpOnError Create a heap dump on a Error
      */
-    MemoryManagerAnalyzer(final CIDTable p_cidTable, final SmallObjectHeap p_heap,
-                          final boolean p_quite, final boolean p_dumpOnError){
-        m_table = p_cidTable;
-        m_heap = p_heap;
-        m_quiet = p_quite;
+    MemoryManagerAnalyzer(final MemoryManager memoryManager,
+                          final boolean p_quiet, final boolean p_dumpOnError){
+        m_table = memoryManager.cidTable;
+        m_heap = memoryManager.smallObjectHeap;
+        m_info = memoryManager.memoryInformation;
+
+        m_quiet = p_quiet;
         m_dumpOnError = p_dumpOnError;
         LOGGER.info(String.format("Init with: be quiet(print only errors): %b, do dump on error: %b", m_quiet, m_dumpOnError));
 
@@ -79,7 +81,7 @@ final class MemoryManagerAnalyzer {
      *
      * @return True if no error occurred, false else
      */
-    final boolean analyze(){
+    final public boolean analyze(){
         assert  m_table.getNextLocalIDCounter()-1 < Integer.MAX_VALUE;
 
         long address;
@@ -106,7 +108,7 @@ final class MemoryManagerAnalyzer {
                 case 2:
                     if (predictedAddress != nextFree) {
                         ERROR = true;
-                        LOGGER.error(String.format("\033[0;31m >> expected: 0x%X get: 0x%X\033[0m", predictedAddress, nextFree));
+                        LOGGER.error(String.format("1\033[0;31m >> expected: 0x%X get: 0x%X\033[0m", predictedAddress, nextFree));
                     }
 
                     checkFreeBlock(predictedAddress, true);
@@ -118,7 +120,7 @@ final class MemoryManagerAnalyzer {
                         address = ADDRESS.get(nextData);
                         if (predictedAddress != address) {
                             ERROR = true;
-                            LOGGER.error(String.format("\033[0;31m >> expected: 0x%X get: 0x%X\033[0m", predictedAddress, address));
+                            LOGGER.error(String.format("2\033[0;31m >> expected: 0x%X get: 0x%X\033[0m", predictedAddress, address));
                         }
                         checkDataBlock(nextData);
                         nextData = getNext(m_dataBlocks);
@@ -127,7 +129,7 @@ final class MemoryManagerAnalyzer {
                         address = ADDRESS.get(nextTable);
                         if (predictedAddress != address) {
                             ERROR = true;
-                            LOGGER.error(String.format("\033[0;31m >> expected: 0x%X get: 0x%X\033[0m", predictedAddress, address));
+                            LOGGER.error(String.format("3\033[0;31m >> expected: 0x%X get: 0x%X\033[0m", predictedAddress, address));
                         }
                         checkTable(address);
                         nextTable = getNext(m_managementTables);
@@ -138,9 +140,12 @@ final class MemoryManagerAnalyzer {
                 case 6:
                 case 7:
                     address = ADDRESS.get(nextData);
+                    if(EMBEDDED_LENGTH_FIELD.get(nextData))
+                        address -= LENGTH_FIELD_SIZE.get(nextData);
+
                     if (predictedAddress != address) {
                         ERROR = true;
-                        LOGGER.error(String.format("\033[0;31m >> expected: 0x%X get: 0x%X\033[0m", predictedAddress, address));
+                        LOGGER.error(String.format("4\033[0;31m >> expected: 0x%X get: 0x%X\033[0m", predictedAddress, address));
                     }
                     checkDataBlock(nextData);
                     nextData = getNext(m_dataBlocks);
@@ -203,20 +208,22 @@ final class MemoryManagerAnalyzer {
      * @return LinkedList with all active not migrated level0 entries
      */
     private LinkedList<Long> getAllDataBlocks(){
+        long found = 0;
+        int counter = 0;
         LinkedList<Long> list = new LinkedList<>();
         long entry;
 
         //iterate over all possible chunk ids
-        for (long i = 0; i < m_table.getNextLocalIDCounter(); i++) {
-            entry = m_table.get(i);
+        while (found < m_info.numActiveChunks){
+            entry = m_table.get(counter++);
 
-            if ( entry == FREE_ENTRY || entry == ZOMBIE_ENTRY || FULL_FLAG.get(entry) ){
+            if ( entry == FREE_ENTRY || entry == ZOMBIE_ENTRY ){
                 continue;
             }
 
+            found++;
             list.add(entry);
         }
-
         return list;
     }
 
@@ -249,17 +256,19 @@ final class MemoryManagerAnalyzer {
                 //iterate over all table entries
                 for (int i = 0; i < tableEntries; i++) {
                     entry = m_table.readEntry(curTable, i, tableSize);
-                    if( entry == 0 || entry == ZOMBIE_ENTRY)
+                    if( entry == 0 || entry == ZOMBIE_ENTRY) {
                         continue;
-
-                        tables.add(entry);
                     }
+                    tables.addLast(entry);
+                }
+
                 level--;
 
             } catch (IndexOutOfBoundsException e){
                 break;
             }
         }
+
         return tables;
     }
 
@@ -285,8 +294,14 @@ final class MemoryManagerAnalyzer {
         String cidInfo = entryData(cidEntry);
         StringBuilder out = new StringBuilder("\033[0;33m[DATA]\033[0m\tCID Entry: [" + cidInfo + "], Heap: [");
 
-        long address = ADDRESS.get(cidEntry);
-        long extSize = LENGTH_FIELD.get(cidEntry)+1;
+        int lfs;
+        if(EMBEDDED_LENGTH_FIELD.get(cidEntry)){
+            lfs = (int)LENGTH_FIELD_SIZE.get(cidEntry);
+        } else {
+            lfs = 0;
+        }
+
+        long address = ADDRESS.get(cidEntry) - lfs;
 
         out.append(createLog(INVALID_ADDRESS < address && address < m_heap.m_baseFreeBlockList-SIZE_MARKER_BYTE,
                 String.format("address: 0x%012X, ", address)));
@@ -294,13 +309,14 @@ final class MemoryManagerAnalyzer {
         int marker = m_heap.readRightPartOfMarker(address-SIZE_MARKER_BYTE);
         out.append(createLog(ALLOC_BLOCK_FLAGS_OFFSET <= marker && marker <= 0x7, String.format("marker: %d, ", marker)));
 
-        int lfs = getSizeFromMarker(marker);
-        out.append(createLog(0 <= lfs && lfs <= 4, String.format("lfs: %d, ", lfs)));
+        int lfsFromMarker = getSizeFromMarker(marker);
+        out.append(createLog(0 <= lfsFromMarker && lfsFromMarker <= 4, String.format("lfs: %d, ", lfs)));
+        out.append(createLog(lfs == lfsFromMarker, String.format("lfs: [m: %d, cid: %d], ", lfsFromMarker, lfs)));
 
         long lf = m_heap.read(address, lfs);
         out.append(createLog(0 <= lf && lf < (long)Math.pow(2,32), String.format("internal lf: %d", lf )));
 
-        long fullLF = ((lf << LENGTH_FIELD.SIZE) | (extSize-1)) + 1;
+        long fullLF = m_heap.getSizeDataBlock(cidEntry);
         out.append(createLog(1 <= fullLF && fullLF <= (long)Math.pow(2,42), String.format("], combined lf: %d", fullLF )));
 
         if(marker != m_heap.readLeftPartOfMarker(address + lfs + fullLF)){

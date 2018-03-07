@@ -169,18 +169,19 @@ public final class SmallObjectHeap implements Importable, Exportable {
      * @return Size of the length field to fit the size of the memory block
      */
     static int calculateLengthFieldSizeAllocBlock(final int p_size) {
-        long size = (long)(p_size-1) >> LENGTH_FIELD.SIZE;
-
-        if (size == 0){
+        if (((p_size-1) >> LENGTH_FIELD.SIZE) == 0) {
             return 0;
-        } else if (size >= 1 << 24) {
-            return 4;
-        } else if (size >= 1 << 16) {
-            return 3;
-        } else if (size >= 1 << 8) {
-            return 2;
         } else {
-            return 1;
+            long size = (long)(p_size-1) >> PARTED_LENGTH_FIELD.SIZE;
+            if (size >= 1 << 24) {
+                return 4;
+            } else if (size >= 1 << 16) {
+                return 3;
+            } else if (size >= 1 << 8) {
+                return 2;
+            } else {
+                return 1;
+            }
         }
     }
 
@@ -334,19 +335,18 @@ public final class SmallObjectHeap implements Importable, Exportable {
             ret = new long[p_usedEntries];
 
             for (int i = 0; i < p_usedEntries; i++) {
-                long addr = malloc(p_sizes[i]);
+                long entry = malloc(p_sizes[i]);
 
-                if (addr == INVALID_ADDRESS) {
+                if (entry == INVALID_ADDRESS) {
                     // roll back
-                    long lengthCIDPart = LENGTH_FIELD.BITMASK >> LENGTH_FIELD.OFFSET;
                     for (int j = 0; j < i; j++) {
-                        free(ret[j], p_sizes[j] & lengthCIDPart);
+                        free(ret[j]);
                     }
 
                     return null;
                 }
 
-                ret[i] = addr;
+                ret[i] = entry;
             }
         }
 
@@ -389,19 +389,18 @@ public final class SmallObjectHeap implements Importable, Exportable {
             ret = new long[p_count];
 
             for (int i = 0; i < p_count; i++) {
-                long addr = malloc(p_size);
+                long entry = malloc(p_size);
 
-                if (addr == INVALID_ADDRESS) {
+                if (entry == INVALID_ADDRESS) {
                     // roll back
-                    long lengthCIDPart = p_size & (LENGTH_FIELD.BITMASK >> LENGTH_FIELD.OFFSET);
                     for (int j = 0; j < i; j++) {
-                        free(ret[j], lengthCIDPart);
+                        free(ret[j]);
                     }
 
                     return null;
                 }
 
-                ret[i] = addr;
+                ret[i] = entry;
             }
         }
 
@@ -409,39 +408,34 @@ public final class SmallObjectHeap implements Importable, Exportable {
     }
 
     /**
-     * Frees a memory block
+     * Frees a a raw memory block e.g. a table from the CIDTable. A raw memory
+     * block has no information about the own size.
      *
      * @param p_address
      *         the address of the block
-     * @param p_extSize
+     * @param p_blockSize
      *         Information about the chunk size which are stored externally
      */
-    public void free(final long p_address, final long p_extSize) {
-        int lengthFieldSize;
-
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
-        freeReservedBlock(p_address, lengthFieldSize, getSizeMemoryBlock(p_address, p_extSize));
+    void freeRaw(final long p_address, final int p_blockSize) {
+        freeReservedBlock(p_address, 0, p_blockSize);
     }
 
     /**
-     * Get the size of an allocated block of memory.
+     * Frees a memory block
      *
-     * @param p_address
-     *         Address of the block.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
-     * @return Size of the block in bytes (payload only).
+     * @param p_tableEntry
+     *         CIDTable entry
      */
-    public int getSizeBlock(final long p_address, final long p_extSize) {
+    public void free(final long p_tableEntry) {
         int lengthFieldSize;
 
-        assert assertMemoryBounds(p_address);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+        } else {
+            lengthFieldSize = 0;
+        }
 
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
-
-
-        return (int)((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1;
+        freeReservedBlock(ADDRESS.get(p_tableEntry)-lengthFieldSize, lengthFieldSize, getSizeDataBlock(p_tableEntry));
     }
 
     /**
@@ -467,108 +461,139 @@ public final class SmallObjectHeap implements Importable, Exportable {
     /**
      * Read a single byte from the specified address + offset.
      *
-     * @param p_address
-     *         Address.
+     * @param p_tableEntry
+     *         CID Table entry.
      * @param p_offset
      *         Offset to add to the address.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
      * @return Byte read.
      */
-    public byte readByte(final long p_address, final long p_offset, long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public byte readByte(final long p_tableEntry, final long p_offset){
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, Byte.BYTES);
+         if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+         } else {
+             lengthFieldSize = 0;
+             lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+         }
 
-        return m_memory.readByte(p_address + lengthFieldSize + p_offset);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, Byte.BYTES);
+
+        return m_memory.readByte(address + p_offset);
     }
 
     /**
      * Read a single short from the specified address + offset.
      *
-     * @param p_address
-     *         Address.
+     * @param p_tableEntry
+     *         CID Table entry.
      * @param p_offset
      *         Offset to add to the address.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
      * @return Short read.
      */
-    public short readShort(final long p_address, final long p_offset, long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public short readShort(final long p_tableEntry, final long p_offset){
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, Short.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        return m_memory.readShort(p_address + lengthFieldSize + p_offset);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, Short.BYTES);
+
+        return m_memory.readShort(address + p_offset);
     }
 
     /**
      * Read a single int from the specified address + offset.
      *
-     * @param p_address
-     *         Address.
+     * @param p_tableEntry
+     *         CID Table entry.
      * @param p_offset
      *         Offset to add to the address.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
      * @return Int read.
      */
-    public int readInt(final long p_address, final long p_offset, long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public int readInt(final long p_tableEntry, final long p_offset){
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, Integer.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        return m_memory.readInt(p_address + lengthFieldSize + p_offset);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, Integer.BYTES);
+
+        return m_memory.readInt(address + p_offset);
     }
 
     /**
      * Read a long from the specified address + offset.
      *
-     * @param p_address
-     *         Address.
+     * @param p_tableEntry
+     *         CID Table entry.
      * @param p_offset
      *         Offset to add to the address.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
      * @return Long read.
      */
-    public long readLong(final long p_address, final long p_offset, long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public long readLong(final long p_tableEntry, final long p_offset){
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, Long.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        return m_memory.readLong(p_address + lengthFieldSize + p_offset);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, Long.BYTES);
+
+        return m_memory.readLong(address + p_offset);
+    }
+
+    /**
+     * Read a long from specified raw block address + offset.
+     * A raw block contain no information about the own structure
+     *
+     * @param p_address Raw block address.
+     * @param p_offset Offset to add to the address.
+     * @param p_size Size of the block.
+     * @return Long read.
+     */
+    long readLongRaw(final long p_address, final long p_offset, final long p_size){
+        assertMemoryBlockBounds(p_address, 0, p_size, p_offset, Long.BYTES);
+
+        return m_memory.readLong(p_address + p_offset);
     }
 
     /**
      * Read data into a byte array.
      *
-     * @param p_address
-     *         Address in heap to start at.
+     * @param p_tableEntry
+     *         CIDTable enrty.
      * @param p_offset
      *         Offset to add to start address.
      * @param p_buffer
@@ -577,29 +602,33 @@ public final class SmallObjectHeap implements Importable, Exportable {
      *         Offset within the buffer.
      * @param p_length
      *         Number of elements to read.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
      * @return Number of elements read.
      */
-    public int readBytes(final long p_address, final long p_offset, final byte[] p_buffer, final int p_offsetArray, final int p_length, long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public int readBytes(final long p_tableEntry, final long p_offset, final byte[] p_buffer, final int p_offsetArray, final int p_length) {
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, p_length * Byte.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        return m_memory.readBytes(p_address + lengthFieldSize + p_offset, p_buffer, p_offsetArray, p_length);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, p_length * Byte.BYTES);
+
+        return m_memory.readBytes(address + p_offset, p_buffer, p_offsetArray, p_length);
     }
 
     /**
      * Read data into a short array.
      *
-     * @param p_address
-     *         Address in heap to start at.
+     * @param p_tableEntry
+     *         CIDTable enrty.
      * @param p_offset
      *         Offset to add to start address.
      * @param p_buffer
@@ -608,29 +637,33 @@ public final class SmallObjectHeap implements Importable, Exportable {
      *         Offset within the buffer.
      * @param p_length
      *         Number of elements to read.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
      * @return Number of elements read.
      */
-    public int readShorts(final long p_address, final long p_offset, final short[] p_buffer, final int p_offsetArray, final int p_length, long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public int readShorts(final long p_tableEntry, final long p_offset, final short[] p_buffer, final int p_offsetArray, final int p_length) {
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, p_length * Short.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        return m_memory.readShorts(p_address + lengthFieldSize + p_offset, p_buffer, p_offsetArray, p_length);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, p_length * Short.BYTES);
+
+        return m_memory.readShorts(address + p_offset, p_buffer, p_offsetArray, p_length);
     }
 
     /**
      * Read data into an int array.
      *
-     * @param p_address
-     *         Address in heap to start at.
+     * @param p_tableEntry
+     *         CIDTable enrty.
      * @param p_offset
      *         Offset to add to start address.
      * @param p_buffer
@@ -639,30 +672,34 @@ public final class SmallObjectHeap implements Importable, Exportable {
      *         Offset within the buffer.
      * @param p_length
      *         Number of elements to read.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
      * @return Number of elements read.
      */
-    public int readInts(final long p_address, final long p_offset, final int[] p_buffer, final int p_offsetArray,
-                        final int p_length, final long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public int readInts(final long p_tableEntry, final long p_offset, final int[] p_buffer, final int p_offsetArray,
+                        final int p_length) {
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, p_length * Integer.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        return m_memory.readInts(p_address + lengthFieldSize + p_offset, p_buffer, p_offsetArray, p_length);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, p_length * Integer.BYTES);
+
+        return m_memory.readInts(address + p_offset, p_buffer, p_offsetArray, p_length);
     }
 
     /**
      * Read data into a long array.
      *
-     * @param p_address
-     *         Address in heap to start at.
+     * @param p_tableEntry
+     *         CIDTable enrty.
      * @param p_offset
      *         Offset to add to start address.
      * @param p_buffer
@@ -671,134 +708,169 @@ public final class SmallObjectHeap implements Importable, Exportable {
      *         Offset within the buffer.
      * @param p_length
      *         Number of elements to read.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
      * @return Number of elements read.
      */
-    public int readLongs(final long p_address, final long p_offset, final long[] p_buffer, final int p_offsetArray,
-                         final int p_length, final long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public int readLongs(final long p_tableEntry, final long p_offset, final long[] p_buffer, final int p_offsetArray,
+                         final int p_length) {
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, p_length * Long.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        return m_memory.readLongs(p_address + lengthFieldSize + p_offset, p_buffer, p_offsetArray, p_length);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, p_length * Long.BYTES);
+
+        return m_memory.readLongs(address + p_offset, p_buffer, p_offsetArray, p_length);
     }
 
     /**
      * Write a single byte to the specified address + offset.
      *
-     * @param p_address
-     *         Address.
+     * @param p_tableEntry
+     *         CIDTable entry.
      * @param p_offset
      *         Offset to add to the address.
      * @param p_value
      *         Byte to write.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
      */
-    public void writeByte(final long p_address, final long p_offset, final byte p_value, final long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public void writeByte(final long p_tableEntry, final long p_offset, final byte p_value) {
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, Byte.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        m_memory.writeByte(p_address + lengthFieldSize + p_offset, p_value);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, Byte.BYTES);
+
+        m_memory.writeByte(address + p_offset, p_value);
     }
 
     /**
      * Write a short to the specified address + offset.
      *
-     * @param p_address
-     *         Address.
+     * @param p_tableEntry
+     *         CIDTable entry.
      * @param p_offset
      *         Offset to add to the address.
      * @param p_value
      *         Short to write.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
      */
-    public void writeShort(final long p_address, final long p_offset, final short p_value, final long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public void writeShort(final long p_tableEntry, final long p_offset, final short p_value) {
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, Short.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        m_memory.writeShort(p_address + lengthFieldSize + p_offset, p_value);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, Short.BYTES);
+
+        m_memory.writeShort(address + p_offset, p_value);
     }
 
     /**
      * Write a single int to the specified address + offset.
      *
-     * @param p_address
-     *         Address.
+     * @param p_tableEntry
+     *         CIDTable entry.
      * @param p_offset
      *         Offset to add to the address.
      * @param p_value
-     *         int to write.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
+     *         Int to write.
      */
-    public void writeInt(final long p_address, final long p_offset, final int p_value, final long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public void writeInt(final long p_tableEntry, final long p_offset, final int p_value) {
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, Integer.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        m_memory.writeInt(p_address + lengthFieldSize + p_offset, p_value);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, Integer.BYTES);
+
+        m_memory.writeInt(address + p_offset, p_value);
     }
 
     /**
      * Write a long value to the specified address + offset.
      *
-     * @param p_address
-     *         Address.
+     * @param p_tableEntry
+     *         CIDTable entry.
      * @param p_offset
      *         Offset to add to the address.
      * @param p_value
-     *         Long value to write.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
+     *         Long to write.
      */
-    public void writeLong(final long p_address, final long p_offset, final long p_value, final long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public void writeLong(final long p_tableEntry, final long p_offset, final long p_value) {
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, Long.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        m_memory.writeLong(p_address + lengthFieldSize + p_offset, p_value);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, Long.BYTES);
+
+        m_memory.writeLong(address + p_offset, p_value);
+    }
+
+    /**
+     * Write a long to specified raw block address + offset.
+     * A raw block contain no information about the own structure
+     *
+     * @param p_address Raw block address.
+     * @param p_offset Offset to add to the address.
+     * @param p_value Long to write.
+     * @param p_size Size of the block.
+     */
+    void writeLongRaw(final long p_address, final long p_offset, final long p_value, final long p_size){
+        assertMemoryBlockBounds(p_address, 0, p_size, p_offset, Long.BYTES);
+
+        m_memory.writeLong(p_address + p_offset, p_value);
     }
 
     /**
      * Write an array of bytes to the specified address + offset.
      *
-     * @param p_address
-     *         Address.
+     * @param p_tableEntry
+     *         CIDTable entry.
      * @param p_offset
      *         Offset to add to the address.
      * @param p_value
@@ -807,55 +879,63 @@ public final class SmallObjectHeap implements Importable, Exportable {
      *         Offset within the buffer.
      * @param p_length
      *         Number of elements to read.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
      * @return Number of elements written.
      */
-    public int writeBytes(final long p_address, final long p_offset, final byte[] p_value, final int p_offsetArray,
-                          final int p_length, final long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public int writeBytes(final long p_tableEntry, final long p_offset, final byte[] p_value, final int p_offsetArray,
+                          final int p_length) {
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, Byte.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        return m_memory.writeBytes(p_address + lengthFieldSize + p_offset, p_value, p_offsetArray, p_length);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, Byte.BYTES);
+
+        return m_memory.writeBytes(address + p_offset, p_value, p_offsetArray, p_length);
     }
 
     /**
      * Write an array of shorts to the heap.
      *
-     * @param p_address
-     *         Address of an allocated block of memory.
+     * @param p_tableEntry
+     *         CIDTable entry.
      * @param p_offset
-     *         Offset within the block of memory to start at.
+     *         Offset to add to the address.
      * @param p_value
-     *         Array to write.
+     *         Shorts to write.
      * @param p_offsetArray
-     *         Offset within the array.
+     *         Offset within the buffer.
      * @param p_length
-     *         Number of elements to write.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
+     *         Number of elements to read.
      * @return Number of elements written.
      */
-    public int writeShorts(final long p_address, final long p_offset, final short[] p_value, final int p_offsetArray,
-                           final int p_length, long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public int writeShorts(final long p_tableEntry, final long p_offset, final short[] p_value, final int p_offsetArray,
+                           final int p_length) {
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, Short.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        return m_memory.writeShorts(p_address + lengthFieldSize + p_offset, p_value, p_offsetArray, p_length);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, Short.BYTES);
+
+        return m_memory.writeShorts(address + p_offset, p_value, p_offsetArray, p_length);
     }
 
     // -------------------------------------------------------------------------------------------
@@ -863,65 +943,73 @@ public final class SmallObjectHeap implements Importable, Exportable {
     /**
      * Write an array of ints to the heap.
      *
-     * @param p_address
-     *         Address of an allocated block of memory.
+     * @param p_tableEntry
+     *         CIDTable entry.
      * @param p_offset
-     *         Offset within the block of memory to start at.
+     *         Offset to add to the address.
      * @param p_value
-     *         Array to write.
+     *         Ints to write.
      * @param p_offsetArray
-     *         Offset within the array.
+     *         Offset within the buffer.
      * @param p_length
-     *         Number of elements to write.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
+     *         Number of elements to read.
      * @return Number of elements written.
      */
-    public int writeInts(final long p_address, final long p_offset, final int[] p_value, final int p_offsetArray,
-                         final int p_length, final long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public int writeInts(final long p_tableEntry, final long p_offset, final int[] p_value, final int p_offsetArray,
+                         final int p_length) {
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, Integer.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        return m_memory.writeInts(p_address + lengthFieldSize + p_offset, p_value, p_offsetArray, p_length);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, p_length * Integer.BYTES);
+
+        return m_memory.writeInts(address + p_offset, p_value, p_offsetArray, p_length);
     }
 
     /**
      * Write an array of longs to the heap.
      *
-     * @param p_address
-     *         Address of an allocated block of memory.
+     * @param p_tableEntry
+     *         CIDTable entry.
      * @param p_offset
-     *         Offset within the block of memory to start at.
+     *         Offset to add to the address.
      * @param p_value
-     *         Array to write.
+     *         Longs to write.
      * @param p_offsetArray
-     *         Offset within the array.
+     *         Offset within the buffer.
      * @param p_length
-     *         Number of elements to write.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
+     *         Number of elements to read.
      * @return Number of elements written.
      */
-    public int writeLongs(final long p_address, final long p_offset, final long[] p_value, final int p_offsetArray,
-                          final int p_length, final long p_extSize) {
-        assert assertMemoryBounds(p_address, p_offset);
+    public int writeLongs(final long p_tableEntry, final long p_offset, final long[] p_value, final int p_offsetArray,
+                          final int p_length) {
+        long address = ADDRESS.get(p_tableEntry);
+        assert assertMemoryBounds(address, p_offset);
 
         int lengthFieldSize;
-        // skip length byte(s)
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
+        int lengthField;
 
-        assert assertMemoryBlockBounds(p_address, lengthFieldSize,
-                ((read(p_address, lengthFieldSize) << LENGTH_FIELD.SIZE) | (p_extSize - 1)) + 1,
-                p_offset, Long.BYTES);
+        if(EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            lengthFieldSize = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            lengthField = (int) ((read(address-lengthFieldSize, lengthFieldSize) << PARTED_LENGTH_FIELD.SIZE) | PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        } else {
+            lengthFieldSize = 0;
+            lengthField = (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        }
 
-        return m_memory.writeLongs(p_address + lengthFieldSize + p_offset, p_value, p_offsetArray, p_length);
+        assert assertMemoryBlockBounds(address, lengthFieldSize, lengthField, p_offset, p_length * Long.BYTES);
+
+        return m_memory.writeLongs(address + p_offset, p_value, p_offsetArray, p_length);
     }
 
     @Override
@@ -1047,25 +1135,57 @@ public final class SmallObjectHeap implements Importable, Exportable {
     }
 
     /**
-     * Get the size of the allocated or free'd block of memory specified
-     * by the given address.
+     * Get the data size for a chunk
      *
-     * @param p_address
-     *         Address of block to get the size of.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally.
-     * @return Size of memory block at specified address.
+     * @param p_tableEntry CIDTable Entry
+     * @return The size of chunk data
      */
-    private long getSizeMemoryBlock(final long p_address, final long p_extSize) {
-        int lengthFieldSize;
+    int getSizeDataBlock(final long p_tableEntry){
+        long address = ADDRESS.get(p_tableEntry);
 
-        assert assertMemoryBounds(p_address);
+        assertMemoryBounds(address);
 
-        lengthFieldSize = getSizeFromMarker(readRightPartOfMarker(p_address - SIZE_MARKER_BYTE));
-        if(p_extSize == 0)
-            return read(p_address, lengthFieldSize);
-        else
-            return ((read(p_address, lengthFieldSize)<<LENGTH_FIELD.SIZE) | (p_extSize-1)) + 1;
+        if(!EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            return (int)LENGTH_FIELD.get(p_tableEntry) + 1;
+        } else {
+            int lfs = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+
+            return (int)((read(address-lfs, lfs) << PARTED_LENGTH_FIELD.SIZE) |
+                    PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1;
+        }
+    }
+
+    /**
+     * Get the full size of a chunk (data size + lfs)
+     *
+     * @param p_tableEntry CIDTable entry
+     * @return The full size of the chunk
+     */
+    long getFullDataBlockSize(final long p_tableEntry){
+        long address = ADDRESS.get(p_tableEntry);
+
+        assertMemoryBounds(address);
+
+        if(!EMBEDDED_LENGTH_FIELD.get(p_tableEntry)){
+            return LENGTH_FIELD.get(p_tableEntry) + 1;
+        } else {
+            int lfs = (int)LENGTH_FIELD_SIZE.get(p_tableEntry);
+            return ((read(address-lfs, lfs) << PARTED_LENGTH_FIELD.SIZE) |
+                    PARTED_LENGTH_FIELD.get(p_tableEntry)) + 1 + lfs;
+        }
+    }
+
+    /**
+     * Get the size of a free block. The free block size implies the length fields
+     *
+     * @param p_address Address of the free block
+     * @return The size of the free block
+     */
+    private long getSizeFreeBlock(final long p_address){
+        assertMemoryBounds(p_address);
+        int lfs = getSizeFromMarker(readRightPartOfMarker(p_address-SIZE_MARKER_BYTE));
+
+        return read(p_address, lfs);
     }
 
 
@@ -1074,9 +1194,13 @@ public final class SmallObjectHeap implements Importable, Exportable {
      *
      * @param p_size
      *         Size of the block (payload size).
-     * @return Address of the reserved block or null if out of memory of no block for requested size was found.
+     * @param p_externalManaged
+     *         Do all management external or internal
+     *
+     * @return If managed external return a address or if manage internal return a CID Entry of the reserved block.
+     *          Return a INVALID_ADDRESS if out of memory of no block for requested size was found.
      */
-    private long reserveBlock(final int p_size, final boolean p_onlyExternalLengthField) {
+    private long reserveBlock(final int p_size, final boolean p_externalManaged) {
         assert p_size > 0;
 
         long address;
@@ -1085,11 +1209,12 @@ public final class SmallObjectHeap implements Importable, Exportable {
         byte blockMarker;
 
         if (p_size > m_status.m_maxBlockSize) {
-            throw new MemoryRuntimeException("Req allocation size " + p_size + " is exceeding max memory block size " + m_status.m_maxBlockSize);
+            throw new MemoryRuntimeException("Req allocation size " + p_size +
+                    " is exceeding max memory block size " + m_status.m_maxBlockSize);
         }
 
         // if only a external length field is desired than don't create a length field
-        if(!p_onlyExternalLengthField)
+        if(!p_externalManaged)
             lengthFieldSize = calculateLengthFieldSizeAllocBlock(p_size);
 
         blockMarker = (byte) (ALLOC_BLOCK_FLAGS_OFFSET + lengthFieldSize);
@@ -1104,13 +1229,21 @@ public final class SmallObjectHeap implements Importable, Exportable {
             writeLeftPartOfMarker(address + blockSize, blockMarker);
             writeRightPartOfMarker(address - SIZE_MARKER_BYTE, blockMarker);
 
-            write(address, (p_size-1)>>LENGTH_FIELD.SIZE, lengthFieldSize);
+            if (lengthFieldSize != 0)
+                write(address, (p_size - 1) >> PARTED_LENGTH_FIELD.SIZE, lengthFieldSize);
 
             m_status.m_allocatedPayload += p_size;
             m_status.m_allocatedBlocks++;
+
+
+            if (!p_externalManaged) {
+                return CIDTableEntry.createEntry(address, p_size, lengthFieldSize);
+            } else {
+                return address;
+            }
         }
 
-        return address;
+        return INVALID_ADDRESS;
     }
 
     /**
@@ -1122,7 +1255,6 @@ public final class SmallObjectHeap implements Importable, Exportable {
      */
     private long findFreeBlock(final int p_size) {
         int list;
-        int listIdx;
         long address;
         long freeSize;
         int freeLengthFieldSize;
@@ -1207,7 +1339,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
      *         Total size of the block to reserve. This already needs to include all marker bytes and length fields aside the payload sizes
      * @param p_sizes
      *         List of block sizes (payloads, only)
-     * @return Addresses of the allocated blocks
+     * @return CIDTable entries of the allocated blocks
      */
     private long[] multiReserveBlocks(final int p_bigBlockSize, final int[] p_sizes, final int p_usedEntries) {
         long[] ret;
@@ -1241,9 +1373,10 @@ public final class SmallObjectHeap implements Importable, Exportable {
 
             writeRightPartOfMarker(address - SIZE_MARKER_BYTE, blockMarker);
             writeLeftPartOfMarker(address + lengthFieldSize + size, blockMarker);
-            write(address, size, lengthFieldSize);
+            if(lengthFieldSize != 0)
+                write(address, (size-1)>>PARTED_LENGTH_FIELD.SIZE, lengthFieldSize);
 
-            ret[i] = address;
+            ret[i] = CIDTableEntry.createEntry(address, size, lengthFieldSize);
 
             // +1 : right side marker byte
             address += lengthFieldSize + size + 1;
@@ -1299,9 +1432,10 @@ public final class SmallObjectHeap implements Importable, Exportable {
 
             writeRightPartOfMarker(address - SIZE_MARKER_BYTE, blockMarker);
             writeLeftPartOfMarker(address + lengthFieldSize + size, blockMarker);
-            write(address, size, lengthFieldSize);
+            if(lengthFieldSize != 0)
+                write(address, (size-1)>>PARTED_LENGTH_FIELD.SIZE, lengthFieldSize);
 
-            ret[i] = address;
+            ret[i] = CIDTableEntry.createEntry(address, size, lengthFieldSize);
 
             // +1 : right side marker byte
             address += lengthFieldSize + size + 1;
@@ -1403,7 +1537,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
                 case 2:
                     // Right neighbor block is free -> merge free blocks
                     // + 1 to skip marker byte
-                    rightSize = getSizeMemoryBlock(p_address + lengthFieldSize + blockSize + SIZE_MARKER_BYTE, 0);
+                    rightSize = getSizeFreeBlock(p_address + lengthFieldSize + blockSize + SIZE_MARKER_BYTE);
                     unhookFreeBlock(p_address + lengthFieldSize + blockSize + SIZE_MARKER_BYTE);
                     // we also merge the marker byte
                     rightSize += SIZE_MARKER_BYTE;
@@ -1783,7 +1917,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
          *
          * @return the fragmentation
          */
-        public double getFragmentation() {
+        double getFragmentation() {
             double ret = 0;
 
             if (m_freeSmall64ByteBlocks >= 1 || m_freeBlocks >= 1) {
@@ -1827,18 +1961,4 @@ public final class SmallObjectHeap implements Importable, Exportable {
             return Long.BYTES + Integer.BYTES + Long.BYTES * 5;
         }
     }
-
-
-    //test methods
-
-    public String t_blockInfo(final long p_address, final long p_extLengthField){
-        System.out.println("address: " + p_address);
-        int marker = readRightPartOfMarker(p_address-SIZE_MARKER_BYTE);
-        int lfs = getSizeFromMarker(marker);
-        long lf = read(p_address, lfs);
-
-        return String.format("[%s]Address: 0x%012X, marker %d, embedded LF: %d(size %d), all LF: %d",
-                (marker<ALLOC_BLOCK_FLAGS_OFFSET) ? "FREE":"DATA",p_address, marker, lf, lfs, ((lf << LENGTH_FIELD.SIZE) | (p_extLengthField-1)) + 1);
-    }
-
 }

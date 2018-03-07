@@ -148,7 +148,6 @@ class MemoryInformation {
      *
      * @author Stefan Nothaas, stefan.nothaas@hhu.de, 11.03.2016
      */
-    //TODO fix extends
     public static class Status implements Importable, Exportable {
         private StorageUnit m_freeMemory;
         private StorageUnit m_maxChunkSize;

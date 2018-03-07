@@ -61,14 +61,12 @@ public class MemoryPinning {
      * @return Chunk data
      */
     public byte[] get(final long cidTableEntry){
-        long address = ADDRESS.get(cidTableEntry);
-        assert smallObjectHeap.assertMemoryBounds(address);
+        assert smallObjectHeap.assertMemoryBounds(ADDRESS.get(cidTableEntry));
 
-        long cidLF = LENGTH_FIELD.get(cidTableEntry) + 1;
-        int size = smallObjectHeap.getSizeBlock(address, cidLF);
+        int size = smallObjectHeap.getSizeDataBlock(cidTableEntry);
 
         byte[] data = new byte[size];
-        smallObjectHeap.readBytes(address, 0, data, 0, size, cidLF);
+        smallObjectHeap.readBytes(cidTableEntry, 0, data, 0, size);
 
         return data;
     }
@@ -81,12 +79,8 @@ public class MemoryPinning {
      */
     public void put(final long cidTableEntry, final byte[] data){
         assert data != null;
+        assert smallObjectHeap.assertMemoryBounds(ADDRESS.get(cidTableEntry));
 
-        long address = ADDRESS.get(cidTableEntry);
-        assert smallObjectHeap.assertMemoryBounds(address);
-
-        long cidLF = LENGTH_FIELD.get(cidTableEntry);
-
-        smallObjectHeap.writeBytes(address, 0, data, 0, data.length, cidLF);
+        smallObjectHeap.writeBytes(cidTableEntry, 0, data, 0, data.length);
     }
 }

@@ -534,7 +534,7 @@ final class CIDTable {
      * @return the entry
      */
     long readEntry(final long p_addressTable, final long p_index, final long p_tableSize) {
-        return m_rawMemory.readLong(p_addressTable, ENTRY_SIZE * p_index, p_tableSize);
+        return m_rawMemory.readLongRaw(p_addressTable, ENTRY_SIZE * p_index, p_tableSize);
     }
 
     /**
@@ -550,7 +550,7 @@ final class CIDTable {
      *     the size of the table
      */
     private void writeEntry(final long p_addressTable, final long p_index, final long p_entry, final long p_tableSize) {
-        m_rawMemory.writeLong(p_addressTable, ENTRY_SIZE * p_index, p_entry, p_tableSize);
+        m_rawMemory.writeLongRaw(p_addressTable, ENTRY_SIZE * p_index, p_entry, p_tableSize);
     }
 
     /**
@@ -590,7 +590,7 @@ final class CIDTable {
         long value;
 
         while(true) {
-            value = m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE);
+            value = m_rawMemory.readLongRaw(p_tableAddress, m_offset, LID_TABLE_SIZE);
 
             //check if entry is alive
             if(value == FREE_ENTRY || value == ZOMBIE_ENTRY)
@@ -653,7 +653,7 @@ final class CIDTable {
         long value;
 
         while(true){
-            value = m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE);
+            value = m_rawMemory.readLongRaw(p_tableAddress, m_offset, LID_TABLE_SIZE);
 
             //check if entry is alive
             if(value == FREE_ENTRY || value == ZOMBIE_ENTRY)
@@ -709,7 +709,7 @@ final class CIDTable {
         long value;
 
         while(true){
-            value = m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE);
+            value = m_rawMemory.readLongRaw(p_tableAddress, m_offset, LID_TABLE_SIZE);
 
             //check if entry is alive
             if(value == FREE_ENTRY || value == ZOMBIE_ENTRY)
@@ -726,7 +726,7 @@ final class CIDTable {
         }
 
         // wait until no present read access
-        while((m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE) & READ_ACCESS.BITMASK) != 0){
+        while((m_rawMemory.readLongRaw(p_tableAddress, m_offset, LID_TABLE_SIZE) & READ_ACCESS.BITMASK) != 0){
             Thread.yield();
         }
 
@@ -771,7 +771,7 @@ final class CIDTable {
 
         // delete write access flag
         while(true){
-            value = m_rawMemory.readLong(p_tableAddress, m_offset, LID_TABLE_SIZE);
+            value = m_rawMemory.readLongRaw(p_tableAddress, m_offset, LID_TABLE_SIZE);
 
             //Check if entry is alive
             if(value == FREE_ENTRY || value == ZOMBIE_ENTRY)
@@ -934,7 +934,7 @@ final class CIDTable {
 
         long entry;
         while (true) {
-            entry = m_rawMemory.readLong(entryPosition[0], entryPosition[1] * ENTRY_SIZE, LID_TABLE_SIZE);
+            entry = m_rawMemory.readLongRaw(entryPosition[0], entryPosition[1] * ENTRY_SIZE, LID_TABLE_SIZE);
 
             if(entry == FREE_ENTRY && entry == ZOMBIE_ENTRY)
                 return false;

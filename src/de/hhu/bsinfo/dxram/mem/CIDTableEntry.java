@@ -27,7 +27,7 @@ public class CIDTableEntry {
     static final EntryData PARTED_LENGTH_FIELD = EntryData.create(8);
 
     //If object is smaller or equal 2^10 then save no length field.
-    static public final EntryData LENGTH_FIELD = EntryData.combineData(LENGTH_FIELD_SIZE, PARTED_LENGTH_FIELD);
+    static final EntryData LENGTH_FIELD = EntryData.combineData(LENGTH_FIELD_SIZE, PARTED_LENGTH_FIELD);
 
     // 7 Bit: Count the parallel read access
     static final EntryData READ_ACCESS = EntryData.create(7);
@@ -52,10 +52,12 @@ public class CIDTableEntry {
      *          Address on the heap
      * @param p_size
      *          Size of the chunk
+     * @param p_lengthFieldSize
+     *          The length field size of the block
      * @return A generated normal entry for the CID Table
      */
-    static long createEntry(final long p_address, final long p_size){
-        return createEntry(p_address, p_size, S_NORMAL);
+    static long createEntry(final long p_address, final int p_size, final int p_lengthFieldSize){
+        return createEntry(p_address, p_size, p_lengthFieldSize, S_NORMAL);
     }
 
     /**
@@ -65,16 +67,24 @@ public class CIDTableEntry {
      *          Address on the heap
      * @param p_size
      *          Size of the chunk
+     * @param p_lengthFieldSize
+     *          The length field size of the block
      * @param p_state
      *          State of the Chunk use S_NORMAL, S_NOT_MOVEABLE or S_NOT_REMOVEABLE
      * @return A generated entry for the CID Table
      */
-    private static long createEntry(final long p_addressChunk, final long p_size, int p_state){
-        long entry = 0;
+    private static long createEntry(final long p_addressChunk, final int p_size, final int p_lengthFieldSize, int p_state){
+        long entry;
+        //int lfs = SmallObjectHeap.calculateLengthFieldSizeAllocBlock(p_size);
 
-        //write address
-        entry = ADDRESS.set(entry, p_addressChunk);
-        entry = LENGTH_FIELD.set(entry, p_size - 1);
+        entry = ADDRESS.set(0, p_addressChunk+p_lengthFieldSize);
+        if(p_lengthFieldSize != 0){
+            entry = EMBEDDED_LENGTH_FIELD.set(entry, true);
+            entry = PARTED_LENGTH_FIELD.set(entry, p_size-1);
+            entry = LENGTH_FIELD_SIZE.set(entry, p_lengthFieldSize);
+        } else{
+            entry = LENGTH_FIELD.set(entry, p_size-1);
+        }
         if(p_state != S_NORMAL){
             entry = STATE_NOT_REMOVEABLE.set(entry, p_state == S_NOT_REMOVE);
             entry = STATE_NOT_MOVEABLE.set(entry, p_state == S_NOT_MOVE);

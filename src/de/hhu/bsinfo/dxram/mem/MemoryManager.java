@@ -13,6 +13,7 @@ import de.hhu.bsinfo.soh.StorageUnsafeMemory;
  * @author Florian Hucke (florian.hucke@hhu.de) on 28.02.18
  * @projectname dxram-memory
  */
+@SuppressWarnings("unused")
 public class MemoryManager {
     private SmallObjectHeapDataStructureImExporter[] m_imexporter = new SmallObjectHeapDataStructureImExporter[65536];
 
@@ -41,9 +42,20 @@ public class MemoryManager {
     //Manage------------------------------------------------------------------------------------------------------------
 
     /**
+     * Check the heap for errors
+     *
+     * @param quiet Print only errors
+     * @param dumpOnError Dump the heap on a error
+     * @return True if no error was found, else false
+     */
+    public boolean checkForErrors(final boolean quiet, final boolean dumpOnError){
+        return new MemoryManagerAnalyzer(this, quiet, dumpOnError).analyze();
+    }
+
+    /**
      * Shut down the memory manager
      */
-    void shutdownMemory() {
+    public void shutdownMemory() {
         cidTable.disengage();
         smallObjectHeap.destroy();
     }
@@ -363,7 +375,7 @@ public class MemoryManager {
      *         Start address of the chunk
      * @return Im/Exporter for the chunk
      */
-    SmallObjectHeapDataStructureImExporter getImExporter(final long p_address, final long p_extSize) {
+    SmallObjectHeapDataStructureImExporter getImExporter(final long p_address) {
         long tid = Thread.currentThread().getId();
         if (tid > 65536) {
             throw new RuntimeException("Exceeded max. thread id");
@@ -372,11 +384,10 @@ public class MemoryManager {
         // pool the im/exporters
         SmallObjectHeapDataStructureImExporter importer = m_imexporter[(int) tid];
         if (importer == null) {
-            m_imexporter[(int) tid] = new SmallObjectHeapDataStructureImExporter(smallObjectHeap, p_address, 0, p_extSize);
+            m_imexporter[(int) tid] = new SmallObjectHeapDataStructureImExporter(smallObjectHeap, p_address, 0);
             importer = m_imexporter[(int) tid];
         } else {
             importer.setAllocatedMemoryStartAddress(p_address);
-            importer.setExternalSize(p_extSize);
             importer.setOffset(0);
         }
 

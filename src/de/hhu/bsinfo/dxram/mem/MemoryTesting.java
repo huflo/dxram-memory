@@ -227,7 +227,6 @@ public final class MemoryTesting {
             return FastByteUtils.longToBytes(FastByteUtils.bytesToLong(oldData) + 1);
         };
 
-
         //Lambda Runnable
         Runnable r = () -> {
             //select chunk
@@ -351,19 +350,19 @@ public final class MemoryTesting {
      *
      * @param nChunks Chunks we want to test.
      */
-    public void pinningFunctional(int nChunks){
-        int blockSize = 50;
+    public void pinningFunctional(int nChunks, int blockSize){
         byte[] data = new byte[blockSize];
 
         for (int i = 0; i < data.length; i++) {
             data[i] = (byte) i;
         }
 
-        long[] cids = m.createMulti(50,nChunks);
+        long[] cids = m.createMulti(blockSize,nChunks);
         long[] entry = new long[nChunks];
 
         for (int i = 0; i < nChunks; i++) {
             entry[i] = m.pinChunk(cids[i]); //Pinning ok?
+
             m.remove(cids[i], false); //Flag ok?
 
             m.putPinned(entry[i], data); //put ok?
@@ -389,6 +388,12 @@ public final class MemoryTesting {
      *          Operation count
      * @param nThreads
      *          Number of Threads
+     * @param initialChunks
+     *          The initial chunks
+     * @param initMinSize
+     *          Minimal initial chunk size
+     * @param initMaxSize
+     *          Maximal initial chunk size
      * @param createProbability
      *          Probability of a create access (complement is a delete access)
      * @param readProbability
@@ -404,12 +409,16 @@ public final class MemoryTesting {
      * @param maxSizeInByte
      *          Maximal byte size for a object
      */
-    public final void memoryManagementTest(final long nOperations, final int nThreads, final double createProbability,
-                                     final double readProbability, final double changeProbability, final long minDelayInMS,
-                                     final long maxDelay, final int minSize, final int maxSizeInByte) throws InterruptedException {
+    public final void memoryManagementTest(final long nOperations, final int nThreads, final long initialChunks,
+                                           final int initMinSize, final int initMaxSize,
+                                           final double createProbability, final double readProbability,
+                                           final double changeProbability, final long minDelayInMS, final long maxDelay,
+                                           final int minSize, final int maxSizeInByte) throws InterruptedException {
 
+        //FunctionalInterface for incrementing the value (with a strong consistency)
         ByteDataManipulation increment = (byte[] oldData) -> FastByteUtils.longToBytes(FastByteUtils.bytesToLong(oldData) + 1);
 
+        //Operation counter
         final AtomicLong runs = new AtomicLong(0);
         final AtomicLong read = new AtomicLong(0);
         final AtomicLong write = new AtomicLong(0);
@@ -445,6 +454,14 @@ public final class MemoryTesting {
             }
         };
 
+        //Create initial chunks
+        byte[] data = FastByteUtils.longToBytes(0);
+        long cid;
+        for (int i = 0; i < initialChunks; i++) {
+            cid = m.create((int)getRandom(initMinSize, initMaxSize));
+            m.put(cid, data);
+        }
+
         Stopwatch stopwatch = new Stopwatch();
         stopwatch.start();
         execNOperationsRunnables(nThreads, nThreads, nOperations, r);
@@ -459,8 +476,8 @@ public final class MemoryTesting {
 
     /**
      * Emulate only create and delete accesses
-     *  @param timeToRun
-     *          Time to simulate in ms
+     *  @param nOperations
+     *          Operation count
      * @param createProbability
      *          Probability of a chunk creation
      * @param minSize
@@ -468,12 +485,12 @@ public final class MemoryTesting {
      * @param maxSize
      *          Maximal size of a chunk
      */
-    public final void createDeleteTest(final long timeToRun, final int nThreads, final double createProbability, final int minSize, final int maxSize) throws InterruptedException {
+    public final void createDeleteTest(final long nOperations, final int nThreads, final double createProbability, final int minSize, final int maxSize) throws InterruptedException {
         AtomicLong readCount = new AtomicLong(0);
         AtomicLong writeCount = new AtomicLong(0);
         //Create a Runnable
         Runnable r = () -> {
-            wait(1L,3L);
+            wait(0L,0L);
 
             if(Math.random() < createProbability){
                 int size = (int)getRandom(minSize, maxSize);
@@ -489,9 +506,16 @@ public final class MemoryTesting {
 
         };
 
-        execMaxTimeRunnables(nThreads, nThreads, timeToRun, r);
+        Stopwatch stopwatch = new Stopwatch();
+        stopwatch.start();
+        execNOperationsRunnables(nThreads, nThreads, nOperations, r);
+        stopwatch.stop();
+
+        TestingMeasurements.add(nThreads, stopwatch.toString());
 
         LOGGER.info("reads: %d, writes: %d", readCount.get(), writeCount.get());
+        LOGGER.info("Run: %d => %s", MemoryTesting.TestingMeasurements.l.size(), MemoryTesting.TestingMeasurements.l.getLast());
+
     }
 
     /**
@@ -544,7 +568,7 @@ public final class MemoryTesting {
      * Print the heap structure
      */
     public boolean analyze(){
-        return new MemoryManagerAnalyzer(m.cidTable, m.smallObjectHeap, false, false).analyze();
+        return new MemoryManagerAnalyzer(m, false, false).analyze();
     }
 
     /**
@@ -555,7 +579,7 @@ public final class MemoryTesting {
      */
     @SuppressWarnings("UnusedReturnValue")
     public boolean checkForError(final boolean p_dumpOnError){
-        return new MemoryManagerAnalyzer(m.cidTable, m.smallObjectHeap, true, p_dumpOnError).analyze();
+        return new MemoryManagerAnalyzer(m, true, p_dumpOnError).analyze();
     }
 
 }

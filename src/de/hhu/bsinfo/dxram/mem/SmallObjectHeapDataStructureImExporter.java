@@ -25,28 +25,24 @@ import de.hhu.bsinfo.utils.serialization.*;
 class SmallObjectHeapDataStructureImExporter implements Importer, Exporter {
 
     private SmallObjectHeap m_heap;
-    private long m_allocatedMemoryStartAddress = -1;
+    private long m_allocatedMemoryEntry = -1;
     private int m_offset = -1;
-    private long m_extSize = -1;
 
     /**
      * Constructor
      *
      * @param p_heap
      *         The heap to access for the importer/exporter.
-     * @param p_allocatedMemoryStartAddress
+     * @param p_allocatedMemoryEntry
      *         The start address of the allocated memory block to access.
      * @param p_offset
      *         The start offset within the allocated block.
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally
      */
-    SmallObjectHeapDataStructureImExporter(final SmallObjectHeap p_heap, final long p_allocatedMemoryStartAddress,
-                                           final int p_offset, final long p_extSize) {
+    SmallObjectHeapDataStructureImExporter(final SmallObjectHeap p_heap, final long p_allocatedMemoryEntry,
+                                           final int p_offset) {
         m_heap = p_heap;
-        m_allocatedMemoryStartAddress = p_allocatedMemoryStartAddress;
+        m_allocatedMemoryEntry = p_allocatedMemoryEntry;
         m_offset = p_offset;
-        m_extSize = p_extSize;
     }
 
     /**
@@ -56,7 +52,7 @@ class SmallObjectHeapDataStructureImExporter implements Importer, Exporter {
      *         the start address
      */
     void setAllocatedMemoryStartAddress(final long p_allocatedMemoryStartAddress) {
-        m_allocatedMemoryStartAddress = p_allocatedMemoryStartAddress;
+        m_allocatedMemoryEntry = p_allocatedMemoryStartAddress;
     }
 
     /**
@@ -69,16 +65,6 @@ class SmallObjectHeapDataStructureImExporter implements Importer, Exporter {
         m_offset = p_offset;
     }
 
-    /**
-     * Set information about the chunk size which are stored externally
-     *
-     * @param p_extSize
-     *         Information about the chunk size which are stored externally
-     */
-    void setExternalSize(final long p_extSize){
-        m_extSize = p_extSize;
-    }
-
     @Override
     public void exportObject(final Exportable p_object) {
         p_object.exportObject(this);
@@ -86,31 +72,31 @@ class SmallObjectHeapDataStructureImExporter implements Importer, Exporter {
 
     @Override
     public void writeBoolean(boolean p_v) {
-        m_heap.writeByte(m_allocatedMemoryStartAddress, m_offset, (byte) (p_v ? 1 : 0), m_extSize);
+        m_heap.writeByte(m_allocatedMemoryEntry, m_offset, (byte) (p_v ? 1 : 0));
         m_offset += Byte.BYTES;
     }
 
     @Override
     public void writeByte(final byte p_v) {
-        m_heap.writeByte(m_allocatedMemoryStartAddress, m_offset, p_v, m_extSize);
+        m_heap.writeByte(m_allocatedMemoryEntry, m_offset, p_v);
         m_offset += Byte.BYTES;
     }
 
     @Override
     public void writeShort(final short p_v) {
-        m_heap.writeShort(m_allocatedMemoryStartAddress, m_offset, p_v, m_extSize);
+        m_heap.writeShort(m_allocatedMemoryEntry, m_offset, p_v);
         m_offset += Short.BYTES;
     }
 
     @Override
     public void writeInt(final int p_v) {
-        m_heap.writeInt(m_allocatedMemoryStartAddress, m_offset, p_v, m_extSize);
+        m_heap.writeInt(m_allocatedMemoryEntry, m_offset, p_v);
         m_offset += Integer.BYTES;
     }
 
     @Override
     public void writeLong(final long p_v) {
-        m_heap.writeLong(m_allocatedMemoryStartAddress, m_offset, p_v, m_extSize);
+        m_heap.writeLong(m_allocatedMemoryEntry, m_offset, p_v);
         m_offset += Long.BYTES;
     }
 
@@ -147,7 +133,7 @@ class SmallObjectHeapDataStructureImExporter implements Importer, Exporter {
 
     @Override
     public int writeBytes(final byte[] p_array, final int p_offset, final int p_length) {
-        int written = m_heap.writeBytes(m_allocatedMemoryStartAddress, m_offset, p_array, p_offset, p_length, m_extSize);
+        int written = m_heap.writeBytes(m_allocatedMemoryEntry, m_offset, p_array, p_offset, p_length);
         if (written != -1) {
             m_offset += written * Byte.BYTES;
         }
@@ -161,35 +147,35 @@ class SmallObjectHeapDataStructureImExporter implements Importer, Exporter {
 
     @Override
     public boolean readBoolean(final boolean p_bool) {
-        byte v = m_heap.readByte(m_allocatedMemoryStartAddress, m_offset, m_extSize);
+        byte v = m_heap.readByte(m_allocatedMemoryEntry, m_offset);
         m_offset += Byte.BYTES;
         return v == 1;
     }
 
     @Override
     public byte readByte(final byte p_byte) {
-        byte v = m_heap.readByte(m_allocatedMemoryStartAddress, m_offset, m_extSize);
+        byte v = m_heap.readByte(m_allocatedMemoryEntry, m_offset);
         m_offset += Byte.BYTES;
         return v;
     }
 
     @Override
     public short readShort(final short p_short) {
-        short v = m_heap.readShort(m_allocatedMemoryStartAddress, m_offset, m_extSize);
+        short v = m_heap.readShort(m_allocatedMemoryEntry, m_offset);
         m_offset += Short.BYTES;
         return v;
     }
 
     @Override
     public int readInt(final int p_int) {
-        int v = m_heap.readInt(m_allocatedMemoryStartAddress, m_offset, m_extSize);
+        int v = m_heap.readInt(m_allocatedMemoryEntry, m_offset);
         m_offset += Integer.BYTES;
         return v;
     }
 
     @Override
     public long readLong(final long p_long) {
-        long v = m_heap.readLong(m_allocatedMemoryStartAddress, m_offset, m_extSize);
+        long v = m_heap.readLong(m_allocatedMemoryEntry, m_offset);
         m_offset += Long.BYTES;
         return v;
     }
@@ -233,7 +219,7 @@ class SmallObjectHeapDataStructureImExporter implements Importer, Exporter {
 
     @Override
     public int readBytes(final byte[] p_array, final int p_offset, final int p_length) {
-        int read = m_heap.readBytes(m_allocatedMemoryStartAddress, m_offset, p_array, p_offset, p_length, m_extSize);
+        int read = m_heap.readBytes(m_allocatedMemoryEntry, m_offset, p_array, p_offset, p_length);
         if (read != -1) {
             m_offset += read * Byte.BYTES;
         }
@@ -285,7 +271,7 @@ class SmallObjectHeapDataStructureImExporter implements Importer, Exporter {
 
     @Override
     public int writeShorts(final short[] p_array, final int p_offset, final int p_length) {
-        int written = m_heap.writeShorts(m_allocatedMemoryStartAddress, m_offset, p_array, p_offset, p_length, m_extSize);
+        int written = m_heap.writeShorts(m_allocatedMemoryEntry, m_offset, p_array, p_offset, p_length);
         if (written != -1) {
             m_offset += written * Short.BYTES;
         }
@@ -294,7 +280,7 @@ class SmallObjectHeapDataStructureImExporter implements Importer, Exporter {
 
     @Override
     public int writeInts(final int[] p_array, final int p_offset, final int p_length) {
-        int written = m_heap.writeInts(m_allocatedMemoryStartAddress, m_offset, p_array, p_offset, p_length, m_extSize);
+        int written = m_heap.writeInts(m_allocatedMemoryEntry, m_offset, p_array, p_offset, p_length);
         if (written != -1) {
             m_offset += written * Integer.BYTES;
         }
@@ -303,7 +289,7 @@ class SmallObjectHeapDataStructureImExporter implements Importer, Exporter {
 
     @Override
     public int writeLongs(final long[] p_array, final int p_offset, final int p_length) {
-        int written = m_heap.writeLongs(m_allocatedMemoryStartAddress, m_offset, p_array, p_offset, p_length,m_extSize);
+        int written = m_heap.writeLongs(m_allocatedMemoryEntry, m_offset, p_array, p_offset, p_length);
         if (written != -1) {
             m_offset += written * Long.BYTES;
         }
@@ -351,7 +337,7 @@ class SmallObjectHeapDataStructureImExporter implements Importer, Exporter {
 
     @Override
     public int readShorts(final short[] p_array, final int p_offset, final int p_length) {
-        int read = m_heap.readShorts(m_allocatedMemoryStartAddress, m_offset, p_array, p_offset, p_length, m_extSize);
+        int read = m_heap.readShorts(m_allocatedMemoryEntry, m_offset, p_array, p_offset, p_length);
         if (read != -1) {
             m_offset += read * Short.BYTES;
         }
@@ -360,7 +346,7 @@ class SmallObjectHeapDataStructureImExporter implements Importer, Exporter {
 
     @Override
     public int readInts(final int[] p_array, final int p_offset, final int p_length) {
-        int read = m_heap.readInts(m_allocatedMemoryStartAddress, m_offset, p_array, p_offset, p_length, m_extSize);
+        int read = m_heap.readInts(m_allocatedMemoryEntry, m_offset, p_array, p_offset, p_length);
         if (read != -1) {
             m_offset += read * Integer.BYTES;
         }
@@ -369,7 +355,7 @@ class SmallObjectHeapDataStructureImExporter implements Importer, Exporter {
 
     @Override
     public int readLongs(final long[] p_array, final int p_offset, final int p_length) {
-        int read = m_heap.readLongs(m_allocatedMemoryStartAddress, m_offset, p_array, p_offset, p_length,m_extSize);
+        int read = m_heap.readLongs(m_allocatedMemoryEntry, m_offset, p_array, p_offset, p_length);
         if (read != -1) {
             m_offset += read * Long.BYTES;
         }

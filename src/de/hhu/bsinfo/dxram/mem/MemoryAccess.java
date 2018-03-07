@@ -21,6 +21,7 @@ import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.*;
  * @author Florian Hucke (florian.hucke@hhu.de) on 28.02.18
  * @projectname dxram-memory
  */
+@SuppressWarnings("unused")
 public class MemoryAccess {
     private static final Logger LOGGER = LogManager.getFormatterLogger(MemoryAccess.class.getSimpleName());
 
@@ -52,14 +53,10 @@ public class MemoryAccess {
      *         Data structure to read specified by its ID.
      * @return True if getting the chunk payload was successful, false if no chunk with the ID specified exists.
      */
-    //TODO testing
     public boolean get(final DataStructure p_dataStructure) {
         long[] entryPosition;
 
         long entry;
-        long address;
-        long size;
-        boolean deleted;
         boolean ret = false;
 
 
@@ -78,15 +75,12 @@ public class MemoryAccess {
                 //->SOP_GET.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.get(entryPosition);
-                address = ADDRESS.get(entry);
-                size = LENGTH_FIELD.get(entry) + 1;
-                deleted = FULL_FLAG.get(entry);
-                if (address > SmallObjectHeap.INVALID_ADDRESS && !deleted) {
-                    assert m_rawMemory.getSizeBlock(address, size) == p_dataStructure.sizeofObject();
+                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY ) {
+                    assert m_rawMemory.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
 
                     // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(address, size);
+                    SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(entry);
                     importer.importObject(p_dataStructure);
 
                     p_dataStructure.setState(ChunkState.OK);
@@ -128,9 +122,6 @@ public class MemoryAccess {
 
         byte[] ret = null;
         long entry;
-        long address;
-        long size;
-        boolean deleted;
 
         // #if LOGGER == TRACE
         LOGGER.trace("ENTER get p_chunkID 0x%X", p_chunkID);
@@ -146,16 +137,13 @@ public class MemoryAccess {
                 //->SOP_GET.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.get(entryPosition);
-                address = ADDRESS.get(entry);
-                size = LENGTH_FIELD.get(entry) + 1;
-                deleted = FULL_FLAG.get(entry);
-                if (address > SmallObjectHeap.INVALID_ADDRESS && !deleted) {
-                    int chunkSize = m_rawMemory.getSizeBlock(address, size);
+                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                    int chunkSize = m_rawMemory.getSizeDataBlock(entry);
                     ret = new byte[chunkSize];
 
                     // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(address, size);
+                    SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(entry);
                     int retSize = importer.readBytes(ret);
                     if (retSize != chunkSize) {
                         //->throw new DXRAMRuntimeException("Unknown error, importer size " + retSize + " != chunk size " + chunkSize);
@@ -210,18 +198,15 @@ public class MemoryAccess {
                 //->SOP_GET.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.get(entryPosition);
-                address = ADDRESS.get(entry);
-                size = LENGTH_FIELD.get(entry) + 1;
-                deleted = FULL_FLAG.get(entry);
-                if (address > SmallObjectHeap.INVALID_ADDRESS && !deleted) {
-                    int chunkSize = m_rawMemory.getSizeBlock(address, size);
+                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY){
+                    int chunkSize = m_rawMemory.getSizeDataBlock(entry);
 
                     if (p_offset + chunkSize > p_bufferSize) {
                         ret = 0;
                     } else {
                         // pool the im/exporters
-                        SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(address, size);
+                        SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(entry);
                         ret = importer.readBytes(p_buffer, p_offset, chunkSize);
                         if (ret != chunkSize) {
                             //->throw new DXRAMRuntimeException("Unknown error, importer size " + ret + " != chunk size " + chunkSize);
@@ -278,15 +263,12 @@ public class MemoryAccess {
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.get(entryPosition);
-                address = ADDRESS.get(entry);
-                size = LENGTH_FIELD.get(entry) + 1;
-                deleted = FULL_FLAG.get(entry);
-                if (address > SmallObjectHeap.INVALID_ADDRESS && !deleted) {
-                    assert m_rawMemory.getSizeBlock(address, size) == p_dataStructure.sizeofObject();
+                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                    assert m_rawMemory.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
 
                     // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter exporter = m_memManager.getImExporter(address, size);
+                    SmallObjectHeapDataStructureImExporter exporter = m_memManager.getImExporter(entry);
                     exporter.exportObject(p_dataStructure);
 
                     p_dataStructure.setState(ChunkState.OK);
@@ -368,14 +350,11 @@ public class MemoryAccess {
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.get(entryPosition);
-                address = ADDRESS.get(entry);
-                size = LENGTH_FIELD.get(entry) + 1;
-                deleted = FULL_FLAG.get(entry);
-                if (address > SmallObjectHeap.INVALID_ADDRESS && !deleted) {
-                    assert p_offset + p_length <= m_rawMemory.getSizeBlock(address, size + 1) : "offset: " + p_offset + "\tlength: " + p_length + "\tbs: " + m_rawMemory.getSizeBlock(address, size);
+                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                    assert p_offset + p_length <= m_rawMemory.getSizeDataBlock(entry) : "offset: " + p_offset + "\tlength: " + p_length + "\tbs: " + m_rawMemory.getSizeDataBlock(entry);
 
-                    m_rawMemory.writeBytes(address, 0, p_data, p_offset, p_length, size);
+                    m_rawMemory.writeBytes(entry, 0, p_data, p_offset, p_length);
                     ret = true;
                 }
 
@@ -414,9 +393,6 @@ public class MemoryAccess {
         long[] entryPosition;
 
         long entry;
-        long address;
-        long size;
-        boolean deleted;
         boolean ret = false;
 
         // #if LOGGER == TRACE
@@ -433,15 +409,12 @@ public class MemoryAccess {
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.get(entryPosition);
-                address = ADDRESS.get(entry);
-                size = LENGTH_FIELD.get(entry) + 1;
-                deleted = FULL_FLAG.get(entry);
-                if (address > SmallObjectHeap.INVALID_ADDRESS && !deleted) {
-                    int fullSize = m_rawMemory.getSizeBlock(address, size);
+                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                    int fullSize = m_rawMemory.getSizeDataBlock(entry);
                     byte[] data = new byte[fullSize];
-                    m_rawMemory.readBytes(address, 0, data,0, data.length, size);
-                    m_rawMemory.writeBytes(address, 0, byteDataManipulation.getNewData(data), 0, data.length, size);
+                    m_rawMemory.readBytes(entry, 0, data,0, data.length);
+                    m_rawMemory.writeBytes(entry, 0, byteDataManipulation.getNewData(data), 0, data.length);
                     ret = true;
                 }
 
@@ -464,13 +437,12 @@ public class MemoryAccess {
     }
 
     //TODO test if functional
-    boolean modify(final DataStructure p_dataStructure, DataStructureManipulation dataStructureManipulation) {
+    boolean modify(final DataStructure p_dataStructure, DataStructureManipulation<DataStructure> dataStructureManipulation) {
         long[] entryPosition;
 
         boolean ret = false;
         long entry;
         long address;
-        long size;
         boolean deleted;
 
         // #if LOGGER == TRACE
@@ -489,16 +461,15 @@ public class MemoryAccess {
 
                 entry = m_cidTable.get(entryPosition);
                 address = ADDRESS.get(entry);
-                size = LENGTH_FIELD.get(entry) + 1;
                 deleted = FULL_FLAG.get(entry);
                 if (address > SmallObjectHeap.INVALID_ADDRESS && !deleted) {
-                    assert m_rawMemory.getSizeBlock(address, size) == p_dataStructure.sizeofObject();
+                    assert m_rawMemory.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
 
                     // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(address, size);
+                    SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(entry);
                     importer.importObject(p_dataStructure);
 
-                    SmallObjectHeapDataStructureImExporter exporter = m_memManager.getImExporter(address, size);
+                    SmallObjectHeapDataStructureImExporter exporter = m_memManager.getImExporter(entry);
                     exporter.exportObject(dataStructureManipulation.getNewData(p_dataStructure));
 
                     p_dataStructure.setState(ChunkState.OK);
@@ -543,9 +514,6 @@ public class MemoryAccess {
         long[] entryPosition;
 
         long entry;
-        long address;
-        long size;
-        boolean deleted;
         boolean ret = false;
 
         // #if LOGGER == TRACE
@@ -562,15 +530,12 @@ public class MemoryAccess {
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.get(entryPosition);
-                address = ADDRESS.get(entry);
-                size = LENGTH_FIELD.get(entry) + 1;
-                deleted = FULL_FLAG.get(entry);
-                if (address > SmallObjectHeap.INVALID_ADDRESS && !deleted) {
-                    int fullSize = m_rawMemory.getSizeBlock(address, size);
+                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                    int fullSize = m_rawMemory.getSizeDataBlock(entry);
                     byte[] data = new byte[fullSize];
-                    m_rawMemory.readBytes(address, 0, data,0, data.length, size);
-                    m_rawMemory.writeBytes(address, 0, chunkDataManipulation.getNewData(data, selected), 0, data.length, size);
+                    m_rawMemory.readBytes(entry, 0, data,0, data.length);
+                    m_rawMemory.writeBytes(entry, 0, chunkDataManipulation.getNewData(data, selected), 0, data.length);
                     ret = true;
                 }
 
@@ -601,17 +566,14 @@ public class MemoryAccess {
      * @return A byte array with payload if getting the chunk payload was successful, null if no chunk with the ID exists.
      */
     public byte[] getTesting(final long p_chunkID, final long[] ref, final int selected) {
-            long[] entryPosition;
+        long[] entryPosition;
 
-            byte[] ret = null;
-            long entry;
-            long address;
-            long size;
-            boolean deleted;
+        byte[] ret = null;
+        long entry;
 
-            // #if LOGGER == TRACE
-            LOGGER.trace("ENTER get p_chunkID 0x%X", p_chunkID);
-            // #endif /* LOGGER == TRACE */
+        // #if LOGGER == TRACE
+        LOGGER.trace("ENTER get p_chunkID 0x%X", p_chunkID);
+        // #endif /* LOGGER == TRACE */
 
             if (p_chunkID != ChunkID.INVALID_ID && //Check if CID can be correct
                     (entryPosition = m_cidTable.getAddressOfEntry(p_chunkID)) != null && //Check if a CID exist
@@ -623,16 +585,13 @@ public class MemoryAccess {
                     //->SOP_GET.enter();
                     // #endif /* STATISTICS */
 
-                    entry = m_cidTable.get(entryPosition);
-                    address = ADDRESS.get(entry);
-                    size = LENGTH_FIELD.get(entry) + 1;
-                    deleted = FULL_FLAG.get(entry);
-                    if (address > SmallObjectHeap.INVALID_ADDRESS && !deleted) {
-                        int chunkSize = m_rawMemory.getSizeBlock(address, size);
+                    entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                    if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                        int chunkSize = m_rawMemory.getSizeDataBlock(entry);
                         ret = new byte[chunkSize];
 
                         // pool the im/exporters
-                        SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(address, size);
+                        SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(entry);
                         int retSize = importer.readBytes(ret);
 
                         if (retSize != chunkSize) {
