@@ -76,6 +76,21 @@ public class MemoryManager {
     }
 
     /**
+     * Get the payload of a chunk/data structure.
+     *
+     * This operation is Thread-Safe
+     *
+     * @param p_dataStructure
+     *         Data structure to read specified by its ID.
+     * @param p_acquireWriteLock
+     *         Acquire write lock to manipulate the data
+     * @return True if getting the chunk payload was successful, false if no chunk with the ID specified exists.
+     */
+    public boolean get(final DataStructure p_dataStructure, final boolean p_acquireWriteLock) {
+        return memoryAccess.get(p_dataStructure, p_acquireWriteLock);
+    }
+
+    /**
      * Get the binary data of a chunk when the chunk size is unknown.
      *
      * This operation is Thread-Safe
@@ -95,10 +110,48 @@ public class MemoryManager {
      *
      * @param p_chunkID
      *         Read the chunk data of the specified ID
+     * @param p_acquireWriteLock
+     *         Acquire write lock to manipulate the data
+     *  @return A byte array with payload if getting the chunk payload was successful, null if no chunk with the ID exists.
+     */
+    public byte[] get(final long p_chunkID, final boolean p_acquireWriteLock) {
+        return memoryAccess.get(p_chunkID, p_acquireWriteLock);
+    }
+
+    /**
+     * Get the binary data of a chunk when the chunk size is known
+     *
+     * @param p_chunkID
+     *          Read the chunk data of the specified ID
+     * @param p_buffer
+     *          Buffer to save data
+     * @param p_offset
+     *          Chunk offset
+     * @param p_bufferSize
+     *          Size of the buffer
      * @return the number of read bytes
      */
     public int get(final long p_chunkID, final byte[] p_buffer, final int p_offset, final int p_bufferSize) {
-        return memoryAccess.get(p_chunkID, p_buffer, p_offset, p_bufferSize);
+        return memoryAccess.get(p_chunkID, p_buffer, p_offset, p_bufferSize, false);
+    }
+
+    /**
+     * Get the binary data of a chunk when the chunk size is known
+     *
+     * @param p_chunkID
+     *          Read the chunk data of the specified ID
+     * @param p_buffer
+     *          Buffer to save data
+     * @param p_offset
+     *          Chunk offset
+     * @param p_bufferSize
+     *          Size of the buffer
+     * @param p_acquireWriteLock
+     *          Acquire write lock to manipulate the data
+     * @return the number of read bytes
+     */
+    public int get(final long p_chunkID, final byte[] p_buffer, final int p_offset, final int p_bufferSize, final boolean p_acquireWriteLock) {
+        return memoryAccess.get(p_chunkID, p_buffer, p_offset, p_bufferSize, p_acquireWriteLock);
     }
 
     /**
@@ -111,7 +164,22 @@ public class MemoryManager {
      * @return True if putting the data was successful, false if no chunk with the specified id exists
      */
     public boolean put(final DataStructure p_dataStructure) {
-        return memoryAccess.put(p_dataStructure);
+        return memoryAccess.put(p_dataStructure, true);
+    }
+
+    /**
+     * Put data of the a data structure/chunk to the memory
+     *
+     * This operation is Thread-Safe
+     *
+     * @param p_dataStructure
+     *         Data structure to put
+     * @param p_acquireWriteLock
+     *         Acquire write lock or is a write lock already set
+     * @return True if putting the data was successful, false if no chunk with the specified id exists
+     */
+    public boolean put(final DataStructure p_dataStructure, final boolean p_acquireWriteLock) {
+        return memoryAccess.put(p_dataStructure, p_acquireWriteLock);
     }
 
     /**
@@ -126,7 +194,24 @@ public class MemoryManager {
      * @return True if putting the data was successful, false if no chunk with the specified id exists
      */
     public boolean put(final long p_chunkID, final byte[] p_data) {
-        return memoryAccess.put(p_chunkID, p_data);
+        return memoryAccess.put(p_chunkID, p_data, true);
+    }
+
+    /**
+     * Put some data into a chunk.
+     *
+     * This operation is Thread-Safe
+     *
+     * @param p_chunkID
+     *         Chunk ID for the data to put
+     * @param p_data
+     *         Chunk data to put
+     * @param p_acquireWriteLock
+     *         Acquire write lock or is a write lock already set
+     * @return True if putting the data was successful, false if no chunk with the specified id exists
+     */
+    public boolean put(final long p_chunkID, final byte[] p_data, final boolean p_acquireWriteLock) {
+        return memoryAccess.put(p_chunkID, p_data, p_acquireWriteLock);
     }
 
     /**
@@ -145,7 +230,28 @@ public class MemoryManager {
      * @return True if putting the data was successful, false if no chunk with the specified id exists
      */
     public boolean put(final long p_chunkID, final byte[] p_data, final int p_offset, final int p_length) {
-        return memoryAccess.put(p_chunkID, p_data, p_offset, p_length);
+        return memoryAccess.put(p_chunkID, p_data, p_offset, p_length, true);
+    }
+
+    /**
+     * Put some data into a chunk.
+     *
+     * This operation is Thread-Safe
+     *
+     * @param p_chunkID
+     *         Chunk ID for the data to put
+     * @param p_data
+     *         Chunk data to put
+     * @param p_offset
+     *         Offset for p_data array
+     * @param p_length
+     *         Number of bytes to put
+     * @param p_acquireWriteLock
+     *         Acquire write lock or is a write lock already set
+     * @return True if putting the data was successful, false if no chunk with the specified id exists
+     */
+    public boolean put(final long p_chunkID, final byte[] p_data, final int p_offset, final int p_length, final boolean p_acquireWriteLock) {
+        return memoryAccess.put(p_chunkID, p_data, p_offset, p_length, p_acquireWriteLock);
     }
 
     /**

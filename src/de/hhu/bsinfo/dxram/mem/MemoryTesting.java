@@ -234,7 +234,11 @@ public final class MemoryTesting {
 
             if(Math.random() <= writeProbability){
                 //write access
-                m.memoryAccess.modifyTest(cids[selectedChunk], increment, selectedChunk);
+                byte[] data = m.get(cids[selectedChunk], true);
+                ref[selectedChunk]++;
+                counter[selectedChunk].incrementAndGet();
+                data = FastByteUtils.longToBytes(FastByteUtils.bytesToLong(data)+1);
+                m.put(cids[selectedChunk], data, false);
             } else{
                 //read access
                 long tmp = FastByteUtils.bytesToLong(m.memoryAccess.getTesting(cids[selectedChunk], ref, selectedChunk));

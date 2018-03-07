@@ -109,6 +109,84 @@ public class MemoryAccess {
     }
 
     /**
+     * Get the payload of a chunk/data structure.
+     *
+     * This operation is Thread-Safe
+     *
+     * @param p_dataStructure
+     *         Data structure to read specified by its ID.
+     * @param p_acquireWriteLock
+     *         Acquire write lock to manipulate the data
+     * @return True if getting the chunk payload was successful, false if no chunk with the ID specified exists.
+     */
+    public boolean get(final DataStructure p_dataStructure, final boolean p_acquireWriteLock) {
+        long[] entryPosition = m_cidTable.getAddressOfEntry(p_dataStructure.getID());
+
+        long entry;
+        boolean ret = false;
+        boolean gotLock = false;
+
+        // #if LOGGER == TRACE
+        LOGGER.trace("ENTER get p_dataStructure 0x%X", p_dataStructure.getID());
+        // #endif /* LOGGER == TRACE */
+
+
+
+        if (p_dataStructure.getID() == ChunkID.INVALID_ID) { //Check if CID can be correct
+            p_dataStructure.setState(ChunkState.INVALID_ID);
+        } else if (entryPosition == null){ //Check if a CID exist
+            p_dataStructure.setState(ChunkState.DOES_NOT_EXIST);
+        } else {
+            if (p_acquireWriteLock)
+                gotLock = m_cidTable.writeLock(entryPosition);
+            else
+                gotLock = m_cidTable.readLock(entryPosition);
+        }
+
+        if(gotLock){ //check if a lock was received
+            try {
+
+                // #ifdef STATISTICS
+                //->SOP_GET.enter();
+                // #endif /* STATISTICS */
+
+                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY ) {
+                    assert m_rawMemory.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
+
+                    // pool the im/exporters
+                    SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(entry);
+                    importer.importObject(p_dataStructure);
+
+                    p_dataStructure.setState(ChunkState.OK);
+                    ret = true;
+                } else {
+                    p_dataStructure.setState(ChunkState.DOES_NOT_EXIST);
+                }
+
+                // #ifdef STATISTICS
+                //->SOP_GET.leave();
+                // #endif /* STATISTICS */
+
+            } catch (final MemoryRuntimeException e) {
+                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+                if(p_acquireWriteLock)
+                    m_cidTable.writeUnlock(entryPosition);
+                throw e;
+            } finally {
+                if(!p_acquireWriteLock)
+                    m_cidTable.readUnlock(entryPosition);
+            }
+        }
+
+        // #if LOGGER == TRACE
+        LOGGER.trace("EXIT get p_dataStructure 0x%X", p_dataStructure.getID());
+        // #endif /* LOGGER == TRACE */
+
+        return ret;
+    }
+
+    /**
      * Get the binary data of a chunk when the chunk size is unknown.
      *
      * This operation is Thread-Safe
@@ -177,22 +255,107 @@ public class MemoryAccess {
      *
      * @param p_chunkID
      *         Read the chunk data of the specified ID
+     * @param p_acquireWriteLock
+     *         Acquire write lock to manipulate the data
+     * @return A byte array with payload if getting the chunk payload was successful, null if no chunk with the ID exists.
+     */
+    public byte[] get(final long p_chunkID, final boolean p_acquireWriteLock) {
+        long[] entryPosition = (p_chunkID != ChunkID.INVALID_ID) ? m_cidTable.getAddressOfEntry(p_chunkID):null;
+
+        byte[] ret = null;
+        long entry;
+        boolean gotLock = false;
+
+        // #if LOGGER == TRACE
+        LOGGER.trace("ENTER get p_chunkID 0x%X", p_chunkID);
+        // #endif /* LOGGER == TRACE */
+
+        if (entryPosition != null){ //Check if a CID exist
+            if (p_acquireWriteLock)
+                gotLock = m_cidTable.writeLock(entryPosition);
+            else
+                gotLock = m_cidTable.readLock(entryPosition);
+        }
+
+        if(gotLock){ //check if a lock was received
+            try {
+
+                // #ifdef STATISTICS
+                //->SOP_GET.enter();
+                // #endif /* STATISTICS */
+
+                entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
+                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                    int chunkSize = m_rawMemory.getSizeDataBlock(entry);
+                    ret = new byte[chunkSize];
+
+                    // pool the im/exporters
+                    SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(entry);
+                    int retSize = importer.readBytes(ret);
+                    if (retSize != chunkSize) {
+                        //->throw new DXRAMRuntimeException("Unknown error, importer size " + retSize + " != chunk size " + chunkSize);
+                        throw new RuntimeException("Unknown error, importer size " + retSize + " != chunk size " + chunkSize);//<<
+                    }
+                }
+
+                // #ifdef STATISTICS
+                //->SOP_GET.leave();
+                // #endif /* STATISTICS */
+
+            } catch (final MemoryRuntimeException e) {
+                if(p_acquireWriteLock)
+                    m_cidTable.writeUnlock(entryPosition);
+
+                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+                throw e;
+            } finally {
+                if(!p_acquireWriteLock)
+                    m_cidTable.readUnlock(entryPosition);
+            }
+        }
+
+        // #if LOGGER == TRACE
+        LOGGER.trace("EXIT get p_chunkID 0x%X", p_chunkID);
+        // #endif /* LOGGER == TRACE */
+
+        return ret;
+    }
+
+    /**
+     * Get the binary data of a chunk when the chunk size is known
+     *
+     * @param p_chunkID
+     *          Read the chunk data of the specified ID
+     * @param p_buffer
+     *          Buffer to save data
+     * @param p_offset
+     *          Chunk offset
+     * @param p_bufferSize
+     *          Size of the buffer
+     * @param p_acquireWriteLock
+     *          Acquire write lock to manipulate the data
      * @return the number of read bytes
      */
     //TODO testing
-    public int get(final long p_chunkID, final byte[] p_buffer, final int p_offset, final int p_bufferSize) {
-        long[] entryPosition;
+    public int get(final long p_chunkID, final byte[] p_buffer, final int p_offset, final int p_bufferSize, final boolean p_acquireWriteLock) {
+        long[] entryPosition = (p_chunkID != ChunkID.INVALID_ID) ? m_cidTable.getAddressOfEntry(p_chunkID):null;
 
         int ret = -1;
         long entry;
-        long address;
-        long size;
-        boolean deleted;
+        boolean gotLock;
 
+        //Check if a CID exist
+        if (entryPosition == null) {
+            return -1;
+        }
 
-        if (p_chunkID != ChunkID.INVALID_ID && //Check if CID can be correct
-                (entryPosition = m_cidTable.getAddressOfEntry(p_chunkID)) != null && //Check if a CID exist
-                m_cidTable.readLock(entryPosition)) { //check if a lock was received
+        if(p_acquireWriteLock)
+            gotLock = m_cidTable.writeLock(entryPosition);
+        else
+            gotLock = m_cidTable.readLock(entryPosition);
+
+        //check if a lock was received
+        if(gotLock) {
             try {
                 // #ifdef STATISTICS
                 //->SOP_GET.enter();
@@ -218,10 +381,13 @@ public class MemoryAccess {
                 //->SOP_GET.leave();
                 // #endif /* STATISTICS */
             } catch (final MemoryRuntimeException e) {
+                if(p_acquireWriteLock)
+                    m_cidTable.writeUnlock(entryPosition);
                 MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
                 throw e;
             } finally {
-                m_cidTable.readUnlock(entryPosition);
+                if(!p_acquireWriteLock)
+                    m_cidTable.readUnlock(entryPosition);
             }
         }
 
@@ -237,17 +403,15 @@ public class MemoryAccess {
      *
      * @param p_dataStructure
      *         Data structure to put
+     * @param p_acquireWriteLock
+     *         Do we need a write lock or is a write lock set
      * @return True if putting the data was successful, false if no chunk with the specified id exists
      */
-    //TODO testing
-    public boolean put(final DataStructure p_dataStructure) {
+    public boolean put(final DataStructure p_dataStructure, final boolean p_acquireWriteLock) {
         long[] entryPosition;
 
         boolean ret = false;
         long entry;
-        long address;
-        long size;
-        boolean deleted;
 
         // #if LOGGER == TRACE
         LOGGER.trace("ENTER put p_dataStructure 0x%X", p_dataStructure.getID());
@@ -257,7 +421,7 @@ public class MemoryAccess {
             p_dataStructure.setState(ChunkState.INVALID_ID);
         } else if ((entryPosition = m_cidTable.getAddressOfEntry(p_dataStructure.getID())) == null){ //Check if a CID exist
             p_dataStructure.setState(ChunkState.DOES_NOT_EXIST);
-        } else if (m_cidTable.writeLock(entryPosition)) { //check if a lock was received
+        } else if (!p_acquireWriteLock || m_cidTable.writeLock(entryPosition)) { //check if a lock was received
             try {
                 // #ifdef STATISTICS
                 //->SOP_PUT.enter();
@@ -306,10 +470,12 @@ public class MemoryAccess {
      *         Chunk ID for the data to put
      * @param p_data
      *         Chunk data to put
+     * @param p_acquireWriteLock
+     *         Do we need a write lock or is a write lock set
      * @return True if putting the data was successful, false if no chunk with the specified id exists
      */
-    public boolean put(final long p_chunkID, final byte[] p_data) {
-        return put(p_chunkID, p_data, 0, p_data.length);
+    public boolean put(final long p_chunkID, final byte[] p_data, final boolean p_acquireWriteLock) {
+        return put(p_chunkID, p_data, 0, p_data.length, p_acquireWriteLock);
     }
 
     /**
@@ -325,15 +491,14 @@ public class MemoryAccess {
      *         Offset for p_data array
      * @param p_length
      *         Number of bytes to put
+     * @param p_acquireWriteLock
+     *         Do we need a write lock or is a write lock set
      * @return True if putting the data was successful, false if no chunk with the specified id exists
      */
-    boolean put(final long p_chunkID, final byte[] p_data, final int p_offset, final int p_length) {
+    boolean put(final long p_chunkID, final byte[] p_data, final int p_offset, final int p_length, final boolean p_acquireWriteLock) {
         long[] entryPosition;
 
         long entry;
-        long address;
-        long size;
-        boolean deleted;
         boolean ret = false;
 
         // #if LOGGER == TRACE
@@ -342,7 +507,7 @@ public class MemoryAccess {
 
         if (p_chunkID != ChunkID.INVALID_ID && //Check if CID can be correct
                 (entryPosition = m_cidTable.getAddressOfEntry(p_chunkID)) != null && //Check if a CID exist
-                m_cidTable.writeLock(entryPosition)) { //check if a lock was received
+                (!p_acquireWriteLock || m_cidTable.writeLock(entryPosition))) { //check if a lock was received
 
             try {
 
