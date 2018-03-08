@@ -153,8 +153,10 @@ public class MultiThreadMeasurementHelper {
          * @return A String
          */
         String getStats(){
-            StringBuilder out = new StringBuilder(String.format("%s\nhit(%d)\t-> best: %d, worst: %d, avg: %d\n",
-                    name, hit.get(), hit_best.get(), hit_worst.get(), hit_accu_time.get()/hit.get()));
+            StringBuilder out = new StringBuilder(name).append('\n');
+            if(hit.get() > 0)
+                out.append(String.format("hit(%d)\t-> best: %d, worst: %d, avg: %d\n",
+                    hit.get(), hit_best.get(), hit_worst.get(), hit_accu_time.get()/hit.get()));
 
             if(miss.get() > 0)
                 out.append(String.format("miss(%d)\t-> best: %d, worst: %d, avg: %d\n",
