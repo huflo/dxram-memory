@@ -28,9 +28,9 @@ for branch in $(get_branch_names)
 do
     $GIT checkout $branch &> /dev/null
 
-    for readProb in $(seq 0.0 0.25 1.0); do
-        for createProb in $(seq 0.0 0.25 1.0); do
-            for changeProb in $(seq 0.0 0.25 1.0); do
+    for readProb in $(LANG=en seq 0.0 0.25 1.0); do
+        for createProb in $(LANG=en seq 0.0 0.25 1.0); do
+            for changeProb in $(LANG=en seq 0.0 0.25 1.0); do
                 $PWD/start-dxram-memory.sh $nodeID $heapSize $blockSize $branch\
                     $rounds $nOperations $nThreads $initChunks $initMin $initMax \
                     $createProb $readProb $changeProb $minDelay $maxDelay \
