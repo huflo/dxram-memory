@@ -43,7 +43,7 @@ public class MemoryManager {
     /**
      * Shut down the memory manager
      */
-    void shutdownMemory() {
+    public void shutdownMemory() {
         cidTable.disengage();
         smallObjectHeap.destroy();
     }
