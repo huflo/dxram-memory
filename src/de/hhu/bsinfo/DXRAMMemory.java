@@ -41,5 +41,6 @@ public class DXRAMMemory{
         eval.accessSimulation(rounds, nOperations, nThreads, initialChunks, initMinSize, initMaxSize, createProbability,
                 readProbability,changeProbability, minDelayInMS, maxDelay, minSize, maxSizeInByte);
 
+        memoryManager.shutdownMemory();
     }
 }
