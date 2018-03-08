@@ -62,6 +62,17 @@ public class MultiThreadMeasurementHelper {
     }
 
     /**
+     * Write collected stats to a file
+     *
+     * @throws IOException The FileChannel can throw a IOException
+     */
+    public void writeStats() throws IOException {
+        MultiThreadWriter mtw = new MultiThreadWriter(Paths.get(folder + "stats_" + round), descLine);
+        mtw.add(getStats());
+        mtw.close();
+    }
+
+    /**
      * Get all stats of the measurements
      *
      * @return A String of all measurements.
