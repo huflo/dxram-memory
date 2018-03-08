@@ -24,6 +24,7 @@ public class MemoryManager {
     final MemoryInformation memoryInformation;
     final MemoryManagement memoryManagement;
     final MemoryPinning memoryPinning;
+    final FragmentedChunks fragmentedChunks;
 
     public MemoryManager(final short p_nodeID, final long p_heapSize, final int p_maxBlockSize) {
         smallObjectHeap = new SmallObjectHeap(new StorageUnsafeMemory(), p_heapSize, p_maxBlockSize);
@@ -34,6 +35,8 @@ public class MemoryManager {
         memoryInformation = new MemoryInformation(this);
         memoryManagement = new MemoryManagement(this);
         memoryPinning = new MemoryPinning(this);
+        fragmentedChunks = new FragmentedChunks(this);
+        //new Thread(fragmentedChunks).start();
 
         memoryInformation.numActiveChunks = 0;
         memoryInformation.totalActiveChunkMemory = 0;
