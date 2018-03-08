@@ -176,7 +176,7 @@ public class Evaluation {
             delta = System.nanoTime()-start;
 
             System.out.println("Time: " + delta);
-            System.out.println(measurementHelper.getStats());
+            measurementHelper.writeStats();
             measurementHelper.newRound();
         }
     }
