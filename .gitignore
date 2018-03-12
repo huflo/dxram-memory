@@ -29,8 +29,5 @@ backup/
 #original files
 ORG*.java
 
-#Main file
-DXRAMMemory.java
-
 #Eval files
 /eval/
