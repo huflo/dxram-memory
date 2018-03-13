@@ -9,6 +9,10 @@ public class DXRAMMemory{
 
     public static void main(String[] args) throws InterruptedException, IOException {
 
+        if(args.length == 0)
+            args = new String[]{"0", "1073741824", "4194304", "master", "3", "100", "2", "1000", "16", "48",
+                    "0.05", "0.8", "0.1", "0", "1", "16", "2048"};
+
         if(args.length < 17){
             System.out.println("Run: nodeID heapSize blockSize branchName nOperations nThreads initialChunks initMinSize initMaxSize\n" +
                     "createProbability readProbability changeProbability minDelayInMS maxDelay\n" +
