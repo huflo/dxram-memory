@@ -1,6 +1,7 @@
 package de.hhu.bsinfo.dxram.mem;
 
 import de.hhu.bsinfo.dxram.data.ChunkID;
+import de.hhu.bsinfo.pt.PerfTimer;
 import de.hhu.bsinfo.utils.FastByteUtils;
 import de.hhu.bsinfo.utils.eval.MultiThreadMeasurementHelper;
 import org.apache.logging.log4j.LogManager;
@@ -49,8 +50,10 @@ public class Evaluation {
      * @param p_memoryManager The memory unit
      * @param p_resultPath The path for  measurement results
      */
-    public Evaluation(final MemoryManager p_memoryManager, final String p_resultPath) {
+    public Evaluation(final MemoryManager p_memoryManager, final String p_resultPath,
+                      final boolean readLock, final boolean writeLock) {
         memoryManager = p_memoryManager;
+        memoryManager.memoryAccess.setLocks(readLock, writeLock);
 
         String tmpPath =  p_resultPath;
         if(!tmpPath.endsWith("/"))
@@ -61,48 +64,52 @@ public class Evaluation {
         resultFolder = tmpPath;
     }
 
-
     /**
      * Extended memory test to emulate real life access
      *
+     * @param rounds
+     *          Number of test runs
      * @param nOperations
-     *          Operation count
+     *          Number of operations
      * @param nThreads
-     *          Number of Threads
+     *          Number of threads
      * @param initialChunks
-     *          The initial chunks
+     *          Number of initial chunks
      * @param initMinSize
-     *          Minimal initial chunk size
+     *          Minimum chunk size at initialization
      * @param initMaxSize
-     *          Maximal initial chunk size
+     *          Maximum chunk size at initialization
      * @param createProbability
-     *          Probability of a create access (complement is a delete access)
-     * @param readProbability
-     *          Probability of a read access (complement is a write access)
-     * @param changeProbability
-     *          Probability of a data change (complement is a create/delete access)
+     *          Probability of chunk creation
+     * @param removeProbability
+     *          Chunk deletion probability
+     * @param writeProbability
+     *          Probability of write access to a chunk
      * @param minDelay
-     *          Minimal delay between operations
+     *          Minimum delay between operations
      * @param maxDelay
-     *          Maximal delay between operations
+     *          Maximum delay between operations
      * @param minSize
-     *          Minimal byte size for a object
+     *          Minimum size of a newly created chunk
      * @param maxSize
-     *          Maximal byte size for a object
+     *          Maximum size of a newly created chunk
      */
     public final void accessSimulation(final long rounds, final long nOperations, final int nThreads, final long initialChunks,
                                        final int initMinSize, final int initMaxSize,
-                                       final double createProbability, final double readProbability,
-                                       final double changeProbability, final long minDelay, final long maxDelay,
-                                       final int minSize, final int maxSize) throws InterruptedException, IOException {
+                                       final double createProbability, final double removeProbability,
+                                       final double writeProbability, final long minDelay, final long maxDelay,
+                                       final int minSize, final int maxSize) {
+
+        double removeLimit = createProbability + removeProbability;
+        double writeLimit = removeLimit + writeProbability;
 
         String desc = String.format("operations: %d, threads: %d, init chunks: %d, inti size: [min: %d ,max: %d], " +
-                "probabilities: [create: %f, read: %f, change: %f], delay:[min: %d, max: %d], size:[min: %d, max:%d]",
-                nOperations, nThreads, initialChunks, initMinSize, initMaxSize, createProbability, readProbability, 
-                changeProbability, minDelay, maxDelay, minSize, maxSize);
+                "probabilities: [create: %f, remove: %f, read: %f, write: %f], delay:[min: %d, max: %d], size:[min: %d, max:%d]",
+                nOperations, nThreads, initialChunks, initMinSize, initMaxSize, createProbability, removeProbability,
+                1-writeLimit, writeProbability, minDelay, maxDelay, minSize, maxSize);
 
         System.out.println(desc);
-        
+
         //FunctionalInterface for incrementing the value (with a strong consistency)
         //ByteDataManipulation increment = (byte[] oldData) -> FastByteUtils.longToBytes(FastByteUtils.bytesToLong(oldData) + 1);
 
@@ -110,51 +117,45 @@ public class Evaluation {
 
         
         //Operation counter
-        MultiThreadMeasurementHelper measurementHelper = new MultiThreadMeasurementHelper(resultFolder, desc,
+        MultiThreadMeasurementHelper measurementHelper = new MultiThreadMeasurementHelper(resultFolder, desc, false,
                 "run", "read", "write", "create", "remove");
         
-        MultiThreadMeasurementHelper.Measurement run = measurementHelper.getMeasurement("run");
         MultiThreadMeasurementHelper.Measurement read = measurementHelper.getMeasurement("read");
         MultiThreadMeasurementHelper.Measurement write = measurementHelper.getMeasurement("write");
         MultiThreadMeasurementHelper.Measurement create = measurementHelper.getMeasurement("create");
         MultiThreadMeasurementHelper.Measurement remove = measurementHelper.getMeasurement("remove");
 
-
+        assert read != null && write != null && create != null && remove != null;
 
         final byte[] data = FastByteUtils.longToBytes(0);
         long cid;
 
         Runnable r = () -> {
-            long runStart = System.nanoTime();
             wait(minDelay, maxDelay);
 
             long randomCID = getRandom(1, memoryManager.memoryInformation.getHighestUsedLocalID());
-            if(Math.random() < changeProbability){
-                if(Math.random() < readProbability){
-                    //read data
-                    long readStart = System.nanoTime();
-                    byte[] b = memoryManager.get(randomCID);
-                    read.addTime(b!=null, readStart);
-                } else {
-                    long writeStart = System.nanoTime();
-                    boolean ok = memoryManager.put(randomCID, FastByteUtils.longToBytes(putCounter.getAndIncrement()));
-                    write.addTime(ok, writeStart);
-                }
+            double selector = Math.random();
+
+            if(selector < createProbability) {
+                //create
+                long createStart = System.nanoTime();
+                long c = memoryManager.create((int)getRandom(minSize, maxSize));
+                create.addTime(c != ChunkID.INVALID_ID, createStart);
+
+            } else if(createProbability <= selector && selector < removeLimit) {
+                long removeStart = System.nanoTime();
+                long s = memoryManager.remove(randomCID, false);
+                remove.addTime(s != -1, removeStart);
+            } else if(removeLimit <= selector && selector < writeLimit) {
+                long writeStart = System.nanoTime();
+                boolean ok = memoryManager.memoryAccess.putEval(randomCID, FastByteUtils.longToBytes(putCounter.getAndIncrement()));
+                write.addTime(ok, writeStart);
             } else {
-                if(Math.random() < createProbability){
-                    //create
-                    long createStart = System.nanoTime();
-                    long c = memoryManager.create((int)getRandom(minSize, maxSize));
-                    create.addTime(c != ChunkID.INVALID_ID, createStart);
-
-                } else{
-                    long removeStart = System.nanoTime();
-                    long s = memoryManager.remove(randomCID, false);
-                    remove.addTime(s != -1, removeStart);
-                }
+                //read data
+                long readStart = System.nanoTime();
+                byte[] b = memoryManager.memoryAccess.getEval(randomCID);
+                read.addTime(b!=null, readStart);
             }
-
-            run.addTime(true, runStart);
         };
 
 
@@ -170,13 +171,19 @@ public class Evaluation {
                 memoryManager.put(cid, data);
             }
 
-            long delta;
-            long start = System.nanoTime();
-            execNOperationsRunnables(nThreads, nThreads, nOperations, r);
-            delta = System.nanoTime()-start;
+            long start = SimpleStopwatch.startTime();
+            try {
+                execNOperationsRunnables(nThreads, nThreads, nOperations, r);
+            } catch (InterruptedException e) {
+                System.err.println("Failed");
+            }
+            System.out.println("Time: " + SimpleStopwatch.stopAndGetDelta(start));
 
-            System.out.println("Time: " + delta);
-            measurementHelper.writeStats();
+            try {
+                measurementHelper.writeStats();
+            } catch (IOException ignored) {
+
+            }
             measurementHelper.newRound();
         }
     }
@@ -264,6 +271,36 @@ public class Evaluation {
      */
     private long getRandom(long minValue, long maxValue){
         return minValue + (long)(Math.random() * (maxValue - minValue));
+    }
+
+    /**
+     * Simple Stopwatch based on the PerfTimer
+     */
+    public static class SimpleStopwatch {
+        static {
+            PerfTimer.init(PerfTimer.Type.SYSTEM_NANO_TIME);
+        }
+
+        /**
+         * Get the current time as start time
+         *
+         * @return Start time
+         */
+        static long startTime() {
+            return System.nanoTime();
+        }
+
+        /**
+         * Get a time delta
+         *
+         * @param startTime The start time
+         * @return Time delta
+         */
+        static long stopAndGetDelta(long startTime){
+            //return PerfTimer.convertToNs(PerfTimer.considerOverheadForDelta(PerfTimer.endWeak() - startTime));
+
+            return System.nanoTime() - startTime;
+        }
     }
 
 }
