@@ -2,8 +2,8 @@ package de.hhu.bsinfo.dxram.mem;
 
 import de.hhu.bsinfo.dxram.data.ChunkID;
 import de.hhu.bsinfo.pt.PerfTimer;
-import de.hhu.bsinfo.utils.FastByteUtils;
-import de.hhu.bsinfo.utils.eval.MultiThreadMeasurementHelper;
+import de.hhu.bsinfo.dxutils.FastByteUtils;
+import de.hhu.bsinfo.dxutils.eval.MeasurementHelper;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -28,6 +28,9 @@ public class Evaluation {
 
     private final MemoryManager memoryManager;
     private final String resultFolder;
+
+    private final String fileNameExtension;
+    private final char delim = ',';
 
     //Variable for multi threading
     //Prevent Java heap exceptions by too many Runnables
@@ -55,11 +58,13 @@ public class Evaluation {
         memoryManager = p_memoryManager;
         memoryManager.memoryAccess.setLocks(readLock, writeLock);
 
+        fileNameExtension = String.format("locks: read_%s_-_write_%s", (readLock) ? "r":"w", (writeLock) ? "w":"r" );
+
         String tmpPath =  p_resultPath;
         if(!tmpPath.endsWith("/"))
             tmpPath += "/";
 
-        tmpPath += p_resultPath + df.format(new Date()) + "/";
+        tmpPath += df.format(new Date()) + "/";
 
         resultFolder = tmpPath;
     }
@@ -103,6 +108,8 @@ public class Evaluation {
         double removeLimit = createProbability + removeProbability;
         double writeLimit = removeLimit + writeProbability;
 
+        String baseFilename = String.format("%f_%f_%f", createProbability, removeProbability, writeProbability);
+
         String desc = String.format("operations: %d, threads: %d, init chunks: %d, inti size: [min: %d ,max: %d], " +
                 "probabilities: [create: %f, remove: %f, read: %f, write: %f], delay:[min: %d, max: %d], size:[min: %d, max:%d]",
                 nOperations, nThreads, initialChunks, initMinSize, initMaxSize, createProbability, removeProbability,
@@ -117,13 +124,13 @@ public class Evaluation {
 
         
         //Operation counter
-        MultiThreadMeasurementHelper measurementHelper = new MultiThreadMeasurementHelper(resultFolder, desc, false,
-                "run", "read", "write", "create", "remove");
+        MeasurementHelper measurementHelper = new MeasurementHelper(resultFolder, baseFilename,  desc, false,
+                "read", "write", "create", "remove");
         
-        MultiThreadMeasurementHelper.Measurement read = measurementHelper.getMeasurement("read");
-        MultiThreadMeasurementHelper.Measurement write = measurementHelper.getMeasurement("write");
-        MultiThreadMeasurementHelper.Measurement create = measurementHelper.getMeasurement("create");
-        MultiThreadMeasurementHelper.Measurement remove = measurementHelper.getMeasurement("remove");
+        MeasurementHelper.Measurement read = measurementHelper.getMeasurement("read");
+        MeasurementHelper.Measurement write = measurementHelper.getMeasurement("write");
+        MeasurementHelper.Measurement create = measurementHelper.getMeasurement("create");
+        MeasurementHelper.Measurement remove = measurementHelper.getMeasurement("remove");
 
         assert read != null && write != null && create != null && remove != null;
 
@@ -135,29 +142,30 @@ public class Evaluation {
 
             long randomCID = getRandom(1, memoryManager.memoryInformation.getHighestUsedLocalID());
             double selector = Math.random();
+            long start;
+            boolean ok;
 
             if(selector < createProbability) {
                 //create
-                long createStart = System.nanoTime();
-                long c = memoryManager.create((int)getRandom(minSize, maxSize));
-                create.addTime(c != ChunkID.INVALID_ID, createStart);
+                start = SimpleStopwatch.startTime();
+                ok = memoryManager.create((int)getRandom(minSize, maxSize)) != ChunkID.INVALID_ID;
+                create.addTime(ok, SimpleStopwatch.stopAndGetDelta(start));
 
             } else if(createProbability <= selector && selector < removeLimit) {
-                long removeStart = System.nanoTime();
-                long s = memoryManager.remove(randomCID, false);
-                remove.addTime(s != -1, removeStart);
+                start = SimpleStopwatch.startTime();
+                ok = memoryManager.remove(randomCID, false) != ChunkID.INVALID_ID;
+                remove.addTime(ok, SimpleStopwatch.stopAndGetDelta(start));
             } else if(removeLimit <= selector && selector < writeLimit) {
-                long writeStart = System.nanoTime();
-                boolean ok = memoryManager.memoryAccess.putEval(randomCID, FastByteUtils.longToBytes(putCounter.getAndIncrement()));
-                write.addTime(ok, writeStart);
+                start = SimpleStopwatch.startTime();
+                ok = memoryManager.memoryAccess.putEval(randomCID, FastByteUtils.longToBytes(putCounter.getAndIncrement()));
+                write.addTime(ok, SimpleStopwatch.stopAndGetDelta(start));
             } else {
                 //read data
-                long readStart = System.nanoTime();
-                byte[] b = memoryManager.memoryAccess.getEval(randomCID);
-                read.addTime(b!=null, readStart);
+                start = SimpleStopwatch.startTime();
+                ok = memoryManager.memoryAccess.getEval(randomCID) != null;
+                read.addTime(ok, SimpleStopwatch.stopAndGetDelta(start));
             }
         };
-
 
         for (int i = 0; i < rounds; i++) {
             //cleanup old chunks
@@ -180,7 +188,7 @@ public class Evaluation {
             System.out.println("Time: " + SimpleStopwatch.stopAndGetDelta(start));
 
             try {
-                measurementHelper.writeStats();
+                measurementHelper.writeStats(fileNameExtension, delim);
             } catch (IOException ignored) {
 
             }
@@ -287,7 +295,7 @@ public class Evaluation {
          * @return Start time
          */
         static long startTime() {
-            return System.nanoTime();
+            return PerfTimer.start();
         }
 
         /**
@@ -297,9 +305,7 @@ public class Evaluation {
          * @return Time delta
          */
         static long stopAndGetDelta(long startTime){
-            //return PerfTimer.convertToNs(PerfTimer.considerOverheadForDelta(PerfTimer.endWeak() - startTime));
-
-            return System.nanoTime() - startTime;
+            return PerfTimer.convertToNs(PerfTimer.considerOverheadForDelta(PerfTimer.endWeak() - startTime));
         }
     }
 
