@@ -1,6 +1,6 @@
 package de.hhu.bsinfo.dxram.mem;
 
-import de.hhu.bsinfo.utils.BitMask;
+import de.hhu.bsinfo.dxutils.BitMask;
 
 /**
  * Central place for the CIDTable entry logic
