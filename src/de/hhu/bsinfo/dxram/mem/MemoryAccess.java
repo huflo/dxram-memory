@@ -77,7 +77,7 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
                 entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
-                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                     assert m_rawMemory.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
 
                     // pool the im/exporters
@@ -151,7 +151,7 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
                 entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
-                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                     assert m_rawMemory.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
 
                     // pool the im/exporters
@@ -217,7 +217,7 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
                 entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
-                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                     int chunkSize = m_rawMemory.getSizeDataBlock(entry);
                     ret = new byte[chunkSize];
 
@@ -287,7 +287,7 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
                 entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
-                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                     int chunkSize = m_rawMemory.getSizeDataBlock(entry);
                     ret = new byte[chunkSize];
 
@@ -364,7 +364,7 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
                 entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
-                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                     int chunkSize = m_rawMemory.getSizeDataBlock(entry);
 
                     if (p_offset + chunkSize > p_bufferSize) {
@@ -431,7 +431,7 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
                 entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
-                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                     assert m_rawMemory.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
 
                     // pool the im/exporters
@@ -521,7 +521,7 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
                 entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
-                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                     assert p_offset + p_length <= m_rawMemory.getSizeDataBlock(entry) : "offset: " + p_offset + "\tlength: " + p_length + "\tbs: " + m_rawMemory.getSizeDataBlock(entry);
 
                     m_rawMemory.writeBytes(entry, 0, p_data, p_offset, p_length);
@@ -581,7 +581,7 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
                 entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
-                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                     int fullSize = m_rawMemory.getSizeDataBlock(entry);
                     byte[] data = new byte[fullSize];
                     m_rawMemory.readBytes(entry, 0, data, 0, data.length);
@@ -719,7 +719,7 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
                 entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
-                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                     int fullSize = m_rawMemory.getSizeDataBlock(entry);
                     byte[] data = new byte[fullSize];
                     m_rawMemory.readBytes(entry, 0, data, 0, data.length);
@@ -780,7 +780,7 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
                 entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
-                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                     int chunkSize = m_rawMemory.getSizeDataBlock(entry);
                     ret = new byte[chunkSize];
 
@@ -858,7 +858,7 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
                 entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
-                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+                if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                     int chunkSize = m_rawMemory.getSizeDataBlock(entry);
                     ret = new byte[chunkSize];
 
@@ -951,8 +951,8 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
                 entry = m_cidTable.readEntry(entryPosition[0], entryPosition[1], CIDTable.LID_TABLE_SIZE);
-                if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
-                    assert p_offset + p_length <= m_rawMemory.getSizeDataBlock(entry) : "offset: " + p_offset + "\tlength: " + p_length + "\tbs: " + m_rawMemory.getSizeDataBlock(entry);
+                if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
+                    assert p_offset + p_length <= m_rawMemory.getSizeDataBlock(entry) : "offset: " + p_offset + "\tlength: " + p_length + "\tbs: " + m_rawMemory.getSizeDataBlock(entry) + "\tentry" + CIDTableEntry.entryData(entry);
 
                     m_rawMemory.writeBytes(entry, 0, p_data, p_offset, p_length);
                     ret = true;
