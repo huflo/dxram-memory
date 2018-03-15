@@ -613,7 +613,7 @@ public class MemoryManagement {
 
     /**
      * Removes a Chunk from the memory
-     * This is a management call and has to be locked using lockManage().
+     * This method use a switchable lock. //TODO Reset to normal lock
      *
      * @param p_chunkID
      *         the ChunkID of the Chunk
@@ -633,7 +633,7 @@ public class MemoryManagement {
 
         if (p_chunkID != ChunkID.INVALID_ID &&
                 (entryPosition = m_cidTable.getAddressOfEntry(p_chunkID)) != null &&
-                m_cidTable.writeLock(entryPosition)) {
+                m_memManagement.writeLock(entryPosition)) {
             lockManage();
             try {
                 // #ifdef STATISTICS
@@ -682,7 +682,7 @@ public class MemoryManagement {
                 MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
                 throw e;
             } finally {
-                m_cidTable.writeUnlock(entryPosition);
+                m_memManagement.writeUnlock(entryPosition);
                 unlockManage();
             }
         }
