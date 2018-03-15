@@ -7,7 +7,7 @@ import de.hhu.bsinfo.dxram.mem.manipulation.ByteDataManipulation;
 import de.hhu.bsinfo.dxram.mem.manipulation.ChunkDataManipulationTesting;
 import de.hhu.bsinfo.dxram.mem.manipulation.DataStructureManipulation;
 import de.hhu.bsinfo.soh.MemoryRuntimeException;
-import de.hhu.bsinfo.utils.FastByteUtils;
+import de.hhu.bsinfo.dxutils.FastByteUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

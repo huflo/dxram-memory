@@ -2,8 +2,8 @@ package de.hhu.bsinfo.dxram.mem;
 
 import de.hhu.bsinfo.dxram.mem.manipulation.ByteDataManipulation;
 import de.hhu.bsinfo.dxram.mem.manipulation.ChunkDataManipulationTesting;
-import de.hhu.bsinfo.utils.FastByteUtils;
-import de.hhu.bsinfo.utils.eval.Stopwatch;
+import de.hhu.bsinfo.dxutils.FastByteUtils;
+import de.hhu.bsinfo.dxutils.eval.Stopwatch;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

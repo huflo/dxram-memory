@@ -15,15 +15,15 @@ package de.hhu.bsinfo.dxram.mem;
 
 import de.hhu.bsinfo.dxram.data.ChunkID;
 import de.hhu.bsinfo.dxram.data.ChunkIDRanges;
-import de.hhu.bsinfo.utils.ArrayListLong;
-import de.hhu.bsinfo.utils.BitMask;
+import de.hhu.bsinfo.dxutils.ArrayListLong;
+import de.hhu.bsinfo.dxutils.BitMask;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.*;
 
-//import de.hhu.bsinfo.utils.stats.StatisticsOperation;
-//import de.hhu.bsinfo.utils.stats.StatisticsRecorderManager;
+//import de.hhu.bsinfo.dxutils.stats.StatisticsOperation;
+//import de.hhu.bsinfo.dxutils.stats.StatisticsRecorderManager;
 
 /**
  * Paging-like Tables for the ChunkID-VA mapping

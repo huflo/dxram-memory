@@ -3,11 +3,11 @@ package de.hhu.bsinfo.dxram.mem;
 import de.hhu.bsinfo.dxram.data.ChunkID;
 import de.hhu.bsinfo.dxram.data.ChunkIDRanges;
 import de.hhu.bsinfo.soh.MemoryRuntimeException;
-import de.hhu.bsinfo.utils.serialization.Exportable;
-import de.hhu.bsinfo.utils.serialization.Exporter;
-import de.hhu.bsinfo.utils.serialization.Importable;
-import de.hhu.bsinfo.utils.serialization.Importer;
-import de.hhu.bsinfo.utils.unit.StorageUnit;
+import de.hhu.bsinfo.dxutils.serialization.Exportable;
+import de.hhu.bsinfo.dxutils.serialization.Exporter;
+import de.hhu.bsinfo.dxutils.serialization.Importable;
+import de.hhu.bsinfo.dxutils.serialization.Importer;
+import de.hhu.bsinfo.dxutils.unit.StorageUnit;
 
 import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.*;
 

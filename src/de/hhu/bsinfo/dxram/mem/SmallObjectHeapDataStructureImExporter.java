@@ -13,7 +13,7 @@
 
 package de.hhu.bsinfo.dxram.mem;
 
-import de.hhu.bsinfo.utils.serialization.*;
+import de.hhu.bsinfo.dxutils.serialization.*;
 
 /**
  * Importer/Exporter wrapper to allow Importables/Exportables to be directly written
