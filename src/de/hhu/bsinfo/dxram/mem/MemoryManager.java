@@ -24,6 +24,9 @@ public class MemoryManager {
     final MemoryManagement memoryManagement;
     final MemoryPinning memoryPinning;
 
+    private boolean m_readLock = true;
+    private boolean m_writeLock = true;
+
     public MemoryManager(final short p_nodeID, final long p_heapSize, final int p_maxBlockSize) {
         smallObjectHeap = new SmallObjectHeap(new StorageUnsafeMemory(), p_heapSize, p_maxBlockSize);
         cidTable = new CIDTable(p_nodeID);
@@ -381,5 +384,93 @@ public class MemoryManager {
         }
 
         return importer;
+    }
+
+    //Locks-------------------------------------------------------------------------------------------------------------
+
+    /**
+     * Read lock, this lock is switchable, with the method
+     * setLocks.
+     *
+     *
+     * @param p_entryPosition
+     *              Position of the CIDTable entry
+     * @return
+     *          True if a lock is received, else false
+     *
+     */
+    boolean readLock(final long[] p_entryPosition){
+        if(m_readLock)
+            return cidTable.readLock(p_entryPosition);
+        else
+            return cidTable.writeLock(p_entryPosition);
+    }
+
+    /**
+     * Read unlock, this unlock is switchable, with the method
+     * setLocks.
+     *
+     *
+     * @param p_entryPosition
+     *              Position of the CIDTable entry
+     * @return
+     *          True if a unlock was successful, else false
+     *
+     */
+    boolean readUnlock(final long[] p_entryPosition){
+        if(m_readLock)
+            return cidTable.readUnlock(p_entryPosition);
+        else
+            return cidTable.writeUnlock(p_entryPosition);
+    }
+
+    /**
+     * Write lock, this lock is switchable, with the method
+     * setLocks.
+     *
+     *
+     * @param p_entryPosition
+     *              Position of the CIDTable entry
+     * @return
+     *          True if a lock is received, else false
+     *
+     */
+    boolean writeLock(final long[] p_entryPosition){
+        if(m_writeLock)
+            return cidTable.writeLock(p_entryPosition);
+        else
+            return cidTable.readLock(p_entryPosition);
+    }
+
+    /**
+     * Write unlock, this unlock is switchable, with the method
+     * setLocks.
+     *
+     *
+     * @param p_entryPosition
+     *              Position of the CIDTable entry
+     * @return
+     *          True if a unlock was successful, else false
+     *
+     */
+    boolean writeUnlock(final long[] p_entryPosition){
+        if(m_writeLock)
+            return cidTable.writeUnlock(p_entryPosition);
+        else
+            return cidTable.readUnlock(p_entryPosition);
+    }
+
+
+    /**
+     * Determine the type of access lock.
+     *
+     * @param p_readLock
+     *          If true, use a read lock, otherwise use a write lock for read operations
+     * @param p_writeLock
+     *          If true, use a write lock, otherwise use a read lock  for write operations
+     */
+    final void setLocks(final boolean p_readLock, final boolean p_writeLock) {
+        m_readLock = p_readLock;
+        m_writeLock = p_writeLock;
     }
 }

@@ -629,7 +629,9 @@ public class MemoryManagement {
 
     /**
      * Removes a Chunk from the memory
-     * This is a management call and has to be locked using lockManage().
+     * This method use a switchable lock. //TODO Reset to normal lock
+     *
+     * This operation is Thread-Safe
      *
      * @param p_chunkID
      *         the ChunkID of the Chunk
@@ -638,15 +640,14 @@ public class MemoryManagement {
      *         if chunk was deleted during migration this flag should be set to true
      * @return The size of the deleted chunk if removing the data was successful, -1 if the chunk with the specified id does not exist
      */
-    //TODO testing
     int remove(final long p_chunkID, final boolean p_wasMigrated) {
         int ret = -1;
 
         long[] entryPosition;
-        long entry = 0;
-        long addressDeletedChunk = 0;
-        long size = 0;
-        boolean deleted = false;
+        long entry;
+        long addressDeletedChunk;
+        long size;
+        boolean deleted;
 
         // #if LOGGER == TRACE
         LOGGER.trace("ENTER remove p_chunkID 0x%X, p_wasMigrated %d", p_chunkID, p_wasMigrated);
@@ -654,7 +655,7 @@ public class MemoryManagement {
 
         if (p_chunkID != ChunkID.INVALID_ID &&
                 (entryPosition = m_cidTable.getAddressOfEntry(p_chunkID)) != null &&
-                m_cidTable.writeLock(entryPosition)) {
+                m_memManagement.writeLock(entryPosition)) {
             lockManage();
             try {
                 // #ifdef STATISTICS
@@ -706,9 +707,8 @@ public class MemoryManagement {
                 //handleMemDumpOnError(e, false);
                 throw e;
             } finally {
+                m_memManagement.writeUnlock(entryPosition);
                 unlockManage();
-                //TODO chunkID can be already in reuse
-                m_cidTable.writeUnlock(entryPosition);
             }
         }
 

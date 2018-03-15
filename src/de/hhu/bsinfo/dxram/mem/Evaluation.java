@@ -56,7 +56,7 @@ public class Evaluation {
     public Evaluation(final MemoryManager p_memoryManager, final String p_resultPath,
                       final boolean readLock, final boolean writeLock) {
         memoryManager = p_memoryManager;
-        memoryManager.memoryAccess.setLocks(readLock, writeLock);
+        memoryManager.setLocks(readLock, writeLock);
 
         fileNameExtension = String.format("locks: read_%s_-_write_%s", (readLock) ? "r":"w", (writeLock) ? "w":"r" );
 
@@ -157,12 +157,12 @@ public class Evaluation {
                 remove.addTime(ok, SimpleStopwatch.stopAndGetDelta(start));
             } else if(removeLimit <= selector && selector < writeLimit) {
                 start = SimpleStopwatch.startTime();
-                ok = memoryManager.memoryAccess.putEval(randomCID, FastByteUtils.longToBytes(putCounter.getAndIncrement()));
+                ok = memoryManager.put(randomCID, FastByteUtils.longToBytes(putCounter.getAndIncrement()));
                 write.addTime(ok, SimpleStopwatch.stopAndGetDelta(start));
             } else {
                 //read data
                 start = SimpleStopwatch.startTime();
-                ok = memoryManager.memoryAccess.getEval(randomCID) != null;
+                ok = memoryManager.get(randomCID) != null;
                 read.addTime(ok, SimpleStopwatch.stopAndGetDelta(start));
             }
         };

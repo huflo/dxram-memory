@@ -27,8 +27,6 @@ public class MemoryAccess {
     private final MemoryManager m_memManager;
     private final SmallObjectHeap m_rawMemory;
     private final CIDTable m_cidTable;
-    private boolean m_readLock = true;
-    private boolean m_writeLock = true;
 
     /**
      * Constructor
@@ -118,6 +116,7 @@ public class MemoryAccess {
 
     /**
      * Get the binary data of a chunk when the chunk size is unknown.
+     * This method use a switchable lock. //TODO Reset to normal lock
      *
      * This operation is Thread-Safe
      *
@@ -140,7 +139,7 @@ public class MemoryAccess {
 
         if (p_chunkID != ChunkID.INVALID_ID && //Check if CID can be correct
                 (entryPosition = m_cidTable.getAddressOfEntry(p_chunkID)) != null && //Check if a CID exist
-                m_cidTable.readLock(entryPosition)) { //check if a lock was received
+                m_memManager.readLock(entryPosition)) { //check if a lock was received
 
             try {
 
@@ -173,7 +172,7 @@ public class MemoryAccess {
                 MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
                 throw e;
             } finally {
-                m_cidTable.readUnlock(entryPosition);
+                m_memManager.readUnlock(entryPosition);
             }
         }
 
@@ -334,6 +333,7 @@ public class MemoryAccess {
 
     /**
      * Put some data into a chunk.
+     * This method use a switchable lock. //TODO Reset to normal lock
      *
      * This operation is Thread-Safe
      *
@@ -362,7 +362,7 @@ public class MemoryAccess {
 
         if (p_chunkID != ChunkID.INVALID_ID && //Check if CID can be correct
                 (entryPosition = m_cidTable.getAddressOfEntry(p_chunkID)) != null && //Check if a CID exist
-                m_cidTable.writeLock(entryPosition)) { //check if a lock was received
+                m_memManager.writeLock(entryPosition)) { //check if a lock was received
 
             try {
 
@@ -388,7 +388,7 @@ public class MemoryAccess {
                 MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
                 throw e;
             } finally {
-                m_cidTable.writeUnlock(entryPosition);
+                m_memManager.writeUnlock(entryPosition);
             }
         }
 
@@ -669,259 +669,4 @@ public class MemoryAccess {
 
         return ret;
     }
-
-    //ONLY for eval-----------------------------------------------------------------------------------------------------
-
-    /**
-     * For evaluation we can switch a read lock to a write lock
-     *
-     * Get the binary data of a chunk when the chunk size is unknown.
-     *
-     * This operation is Thread-Safe
-     *
-     * @param p_chunkID
-     *          Read the chunk data of the specified ID
-     * @return
-     *          A byte array with payload if getting the chunk payload
-     *          was successful, null if no chunk with the ID exists.
-     */
-    public byte[] getEval(final long p_chunkID) {
-        long[] entryPosition;
-
-        byte[] ret = null;
-        long entry;
-        long address;
-        long size;
-        boolean deleted;
-
-        // #if LOGGER == TRACE
-        LOGGER.trace("ENTER get p_chunkID 0x%X", p_chunkID);
-        // #endif /* LOGGER == TRACE */
-
-        if (p_chunkID != ChunkID.INVALID_ID && //Check if CID can be correct
-                (entryPosition = m_cidTable.getAddressOfEntry(p_chunkID)) != null && //Check if a CID exist
-                evalReadLock(entryPosition)) { //check if a lock was received
-
-            try {
-
-                // #ifdef STATISTICS
-                //->SOP_GET.enter();
-                // #endif /* STATISTICS */
-
-                entry = m_cidTable.get(entryPosition);
-                address = ADDRESS.get(entry);
-                size = LENGTH_FIELD.get(entry) + 1;
-                deleted = FULL_FLAG.get(entry);
-                if (address > SmallObjectHeap.INVALID_ADDRESS && !deleted) {
-                    int chunkSize = m_rawMemory.getSizeBlock(address, size);
-                    ret = new byte[chunkSize];
-
-                    // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(address, size);
-                    int retSize = importer.readBytes(ret);
-                    if (retSize != chunkSize) {
-                        //->throw new DXRAMRuntimeException("Unknown error, importer size " + retSize + " != chunk size " + chunkSize);
-                        throw new RuntimeException("Unknown error, importer size " + retSize + " != chunk size " + chunkSize);//<<
-                    }
-                }
-
-                // #ifdef STATISTICS
-                //->SOP_GET.leave();
-                // #endif /* STATISTICS */
-
-            } catch (final MemoryRuntimeException e) {
-                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
-                throw e;
-            } finally {
-                evalReadUnlock(entryPosition);
-            }
-        }
-
-        // #if LOGGER == TRACE
-        LOGGER.trace("EXIT get p_chunkID 0x%X", p_chunkID);
-        // #endif /* LOGGER == TRACE */
-
-        return ret;
-    }
-
-    /**
-     * For evaluation we can switch a write lock to a read lock
-     *
-     * Put some data into a chunk.
-     *
-     * This operation is Thread-Safe
-     *
-     * @param p_chunkID
-     *          Chunk ID for the data to put
-     * @param p_data
-     *          Chunk data to put
-     * @return
-     *          True if putting the data was successful, false if
-     *          no chunk with the specified id exists
-     */
-    public boolean putEval(final long p_chunkID, final byte[] p_data) {
-        return putEval(p_chunkID, p_data, 0, p_data.length, false);
-    }
-
-    /**
-     * For evaluation we can switch a write lock to a read lock
-     *
-     * Put some data into a chunk.
-     *
-     * This operation is Thread-Safe
-     *
-     * @param p_chunkID
-     *          Chunk ID for the data to put
-     * @param p_data
-     *          Chunk data to put
-     * @param p_offset
-     *              Offset for p_data array
-     * @param p_length
-     *          Number of bytes to put
-     * @param p_acquireWriteLock
-     *              Do we need a write lock or is a write lock set
-     * @return
-     *          True if putting the data was successful, false if
-     *          no chunk with the specified id exists
-     */
-    private boolean putEval(final long p_chunkID, final byte[] p_data, final int p_offset, final int p_length, final boolean p_acquireWriteLock) {
-        long[] entryPosition;
-
-        long entry;
-        long address;
-        long size;
-        boolean deleted;
-        boolean ret = false;
-
-        // #if LOGGER == TRACE
-        LOGGER.trace("ENTER put p_chunkID 0x%X, p_offset %d, p_length %d", p_chunkID, p_offset, p_length);
-        // #endif /* LOGGER == TRACE */
-
-        if (p_chunkID != ChunkID.INVALID_ID && //Check if CID can be correct
-                (entryPosition = m_cidTable.getAddressOfEntry(p_chunkID)) != null && //Check if a CID exist
-                evalWriteLock(entryPosition)) { //check if a lock was received
-
-            try {
-
-                // #ifdef STATISTICS
-                //->SOP_PUT.enter();
-                // #endif /* STATISTICS */
-
-                entry = m_cidTable.get(entryPosition);
-                address = ADDRESS.get(entry);
-                size = LENGTH_FIELD.get(entry) + 1;
-                deleted = FULL_FLAG.get(entry);
-                if (address > SmallObjectHeap.INVALID_ADDRESS && !deleted) {
-                    assert p_offset + p_length <= m_rawMemory.getSizeBlock(address, size + 1) : "offset: " + p_offset + "\tlength: " + p_length + "\tbs: " + m_rawMemory.getSizeBlock(address, size);
-
-                    m_rawMemory.writeBytes(address, 0, p_data, p_offset, p_length, size);
-                    ret = true;
-                }
-
-                // #ifdef STATISTICS
-                //->SOP_PUT.leave();
-                // #endif /* STATISTICS */
-            } catch (final MemoryRuntimeException e) {
-                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
-                throw e;
-            } finally {
-                evalWriteUnlock(entryPosition);
-            }
-        }
-
-        // #if LOGGER == TRACE
-        LOGGER.trace("EXIT put p_chunkID 0x%X, p_offset %d, p_length %d", p_chunkID, p_offset, p_length);
-        // #endif /* LOGGER == TRACE */
-
-        return ret;
-    }
-
-
-    /**
-     * Read lock for evaluation. This lock is switchable, with the method
-     * setLocks.
-     *
-     *
-     * @param p_entryPosition
-     *              Position of the CIDTable entry
-     * @return
-     *          True if a lock is received, else false
-     *
-     */
-    private boolean evalReadLock(final long[] p_entryPosition){
-        if(m_readLock)
-            return m_cidTable.readLock(p_entryPosition);
-        else
-            return m_cidTable.writeLock(p_entryPosition);
-    }
-
-    /**
-     * Read unlock for evaluation. This unlock is switchable, with the method
-     * setLocks.
-     *
-     *
-     * @param p_entryPosition
-     *              Position of the CIDTable entry
-     * @return
-     *          True if a unlock was successful, else false
-     *
-     */
-    private boolean evalReadUnlock(final long[] p_entryPosition){
-        if(m_readLock)
-            return m_cidTable.readUnlock(p_entryPosition);
-        else
-            return m_cidTable.writeUnlock(p_entryPosition);
-    }
-
-    /**
-     * Write lock for evaluation. This lock is switchable, with the method
-     * setLocks.
-     *
-     *
-     * @param p_entryPosition
-     *              Position of the CIDTable entry
-     * @return
-     *          True if a lock is received, else false
-     *
-     */
-    private boolean evalWriteLock(final long[] p_entryPosition){
-        if(m_writeLock)
-            return m_cidTable.writeLock(p_entryPosition);
-        else
-            return m_cidTable.readLock(p_entryPosition);
-    }
-
-    /**
-     * Write unlock for evaluation. This unlock is switchable, with the method
-     * setLocks.
-     *
-     *
-     * @param p_entryPosition
-     *              Position of the CIDTable entry
-     * @return
-     *          True if a unlock was successful, else false
-     *
-     */
-    private boolean evalWriteUnlock(final long[] p_entryPosition){
-        if(m_writeLock)
-            return m_cidTable.writeUnlock(p_entryPosition);
-        else
-            return m_cidTable.readUnlock(p_entryPosition);
-    }
-
-
-    /**
-     * Determine the type of access lock.
-     *
-     * @param p_readLock
-     *          If true, use a read lock, otherwise use a write lock for read operations
-     * @param p_writeLock
-     *          If true, use a write lock, otherwise use a read lock  for write operations
-     */
-    final void setLocks(final boolean p_readLock, final boolean p_writeLock) {
-        m_readLock = p_readLock;
-        m_writeLock = p_writeLock;
-    }
-
-
 }
