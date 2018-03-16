@@ -27,7 +27,7 @@ public class MemoryDirectAccess {
      *
      */
     MemoryDirectAccess(MemoryManager memoryManager) {
-        this.m_rawMemory = memoryManager.smallObjectHeap;
+        m_rawMemory = memoryManager.smallObjectHeap;
         m_cidTable = memoryManager.cidTable;
     }
 
@@ -44,7 +44,7 @@ public class MemoryDirectAccess {
     public byte readByte(final long p_chunkID, final int p_offset) throws MemoryRuntimeException {
         try {
             long entry = m_cidTable.get(p_chunkID);
-            if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+            if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                 return m_rawMemory.readByte(entry, p_offset);
             } else {
                 return -1;
@@ -68,7 +68,7 @@ public class MemoryDirectAccess {
     public short readShort(final long p_chunkID, final int p_offset) throws MemoryRuntimeException {
         try {
             long entry = m_cidTable.get(p_chunkID);
-            if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+            if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                 return m_rawMemory.readShort(entry, p_offset);
             } else {
                 return -1;
@@ -92,7 +92,7 @@ public class MemoryDirectAccess {
     public int readInt(final long p_chunkID, final int p_offset) throws MemoryRuntimeException {
         try {
             long entry = m_cidTable.get(p_chunkID);
-            if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+            if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                 return m_rawMemory.readInt(entry, p_offset);
             } else {
                 return -1;
@@ -117,7 +117,7 @@ public class MemoryDirectAccess {
 
         try {
             long entry = m_cidTable.get(p_chunkID);
-            if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+            if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                 return m_rawMemory.readLong(entry, p_offset);
             } else {
                 return -1;
@@ -143,7 +143,7 @@ public class MemoryDirectAccess {
     public boolean writeByte(final long p_chunkID, final int p_offset, final byte p_value) throws MemoryRuntimeException {
         try {
             long entry = m_cidTable.get(p_chunkID);
-            if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+            if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                 m_rawMemory.writeByte(entry, p_offset, p_value);
             } else {
                 return false;
@@ -171,7 +171,7 @@ public class MemoryDirectAccess {
     public boolean writeShort(final long p_chunkID, final int p_offset, final short p_value) throws MemoryRuntimeException {
         try {
             long entry = m_cidTable.get(p_chunkID);
-            if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+            if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                 m_rawMemory.writeShort(entry, p_offset, p_value);
             } else {
                 return false;
@@ -199,7 +199,7 @@ public class MemoryDirectAccess {
     public boolean writeInt(final long p_chunkID, final int p_offset, final int p_value) throws MemoryRuntimeException {
         try {
             long entry = m_cidTable.get(p_chunkID);
-            if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+            if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                 m_rawMemory.writeInt(entry, p_offset, p_value);
             } else {
                 return false;
@@ -227,7 +227,7 @@ public class MemoryDirectAccess {
     public boolean writeLong(final long p_chunkID, final int p_offset, final long p_value) throws MemoryRuntimeException {
         try {
             long entry = m_cidTable.get(p_chunkID);
-            if (entry != CIDTable.FREE_ENTRY || entry != CIDTable.ZOMBIE_ENTRY) {
+            if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
                 m_rawMemory.writeLong(entry, p_offset, p_value);
             } else {
                 return false;
