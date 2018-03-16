@@ -15,7 +15,7 @@ package de.hhu.bsinfo.dxram.mem;
 
 
 public class OutOfKeyValueStoreMemoryException extends RuntimeException {
-    OutOfKeyValueStoreMemoryException(final MemoryInformation.Status p_status) {
+    OutOfKeyValueStoreMemoryException(final MemoryManager.MemoryInformation.Status p_status) {
         super("Out of key value store memory, memory status:\n" + p_status);
     }
 }

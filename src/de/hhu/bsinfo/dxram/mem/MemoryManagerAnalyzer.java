@@ -24,7 +24,7 @@ final public class MemoryManagerAnalyzer {
 
     private final SmallObjectHeap m_heap;
     private final CIDTable m_table;
-    private final MemoryInformation m_info;
+    private final MemoryManager.MemoryInformation m_info;
     private final boolean m_quiet;
     private final boolean m_dumpOnError;
 

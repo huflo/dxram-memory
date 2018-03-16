@@ -23,7 +23,6 @@ public class MemoryManagement {
     private final MemoryManager m_memManagement;
     private final SmallObjectHeap m_rawMemory;
     private final CIDTable m_cidTable;
-    private final MemoryInformation m_memStats;
     private final short NODE_ID;
 
     private AtomicInteger m_lock;
@@ -39,7 +38,6 @@ public class MemoryManagement {
         m_memManagement = memoryManager;
         m_rawMemory = memoryManager.smallObjectHeap;
         m_cidTable = memoryManager.cidTable;
-        m_memStats = memoryManager.memoryInformation;
 
         NODE_ID = m_cidTable.m_ownNodeID;
 
@@ -76,8 +74,8 @@ public class MemoryManagement {
                 entry = m_cidTable.delete(0, false);
 
                 m_rawMemory.free(entry);
-                m_memStats.totalActiveChunkMemory -= m_rawMemory.getSizeDataBlock(entry);
-                m_memStats.numActiveChunks--;
+                m_memManagement.memoryInformation.totalActiveChunkMemory -= m_rawMemory.getSizeDataBlock(entry);
+                m_memManagement.memoryInformation.numActiveChunks--;
             }
 
             entry = m_rawMemory.malloc(p_size);
@@ -90,13 +88,13 @@ public class MemoryManagement {
                     // on demand allocation of new table failed
                     // free previously created chunk for data to avoid memory leak
                     m_rawMemory.free(entry);
-                    throw new OutOfKeyValueStoreMemoryException(m_memStats.getStatus());
+                    throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
                 } else {
-                    m_memStats.numActiveChunks++;
-                    m_memStats.totalActiveChunkMemory += p_size;
+                    m_memManagement.memoryInformation.numActiveChunks++;
+                    m_memManagement.memoryInformation.totalActiveChunkMemory += p_size;
                 }
             } else {
-                throw new OutOfKeyValueStoreMemoryException(m_memStats.getStatus());
+                throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
             }
         } catch (final MemoryRuntimeException e) {
             MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
@@ -163,16 +161,16 @@ public class MemoryManagement {
                     m_rawMemory.free(entry);
 
                     //LOGGER.warn("OutOfKeyValueStoreMemory");
-                    //throw new OutOfKeyValueStoreMemoryException(m_memStats.getStatus());
+                    //throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
                 } else {
-                    m_memStats.numActiveChunks++;
-                    m_memStats.totalActiveChunkMemory += p_size;
+                    m_memManagement.memoryInformation.numActiveChunks++;
+                    m_memManagement.memoryInformation.totalActiveChunkMemory += p_size;
                 }
             } else {
                 // put lid back
                 m_cidTable.putChunkIDForReuse(lid);
                 //LOGGER.warn("OutOfKeyValueStoreMemory");
-                //throw new OutOfKeyValueStoreMemoryException(m_memStats.getStatus());
+                //throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
             }
 
             // #ifdef STATISTICS
@@ -232,14 +230,14 @@ public class MemoryManagement {
                         // on demand allocation of new table failed
                         // free previously created chunk for data to avoid memory leak
                         m_rawMemory.free(entry);
-                        throw new OutOfKeyValueStoreMemoryException(m_memStats.getStatus());
+                        throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
                     } else {
-                        m_memStats.numActiveChunks++;
-                        m_memStats.totalActiveChunkMemory += p_size;
+                        m_memManagement.memoryInformation.numActiveChunks++;
+                        m_memManagement.memoryInformation.totalActiveChunkMemory += p_size;
                         chunkID = p_chunkId;
                     }
                 } else {
-                    throw new OutOfKeyValueStoreMemoryException(m_memStats.getStatus());
+                    throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
                 }
             }
 
@@ -322,10 +320,10 @@ public class MemoryManagement {
                             m_rawMemory.free(entries[j]);
                         }
 
-                        throw new OutOfKeyValueStoreMemoryException(m_memStats.getStatus());
+                        throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
                     } else {
-                        m_memStats.numActiveChunks++;
-                        m_memStats.totalActiveChunkMemory += p_sizes[i];
+                        m_memManagement.memoryInformation.numActiveChunks++;
+                        m_memManagement.memoryInformation.totalActiveChunkMemory += p_sizes[i];
                     }
                 }
 
@@ -335,7 +333,7 @@ public class MemoryManagement {
                     m_cidTable.putChunkIDForReuse(lids[i]);
                 }
 
-                throw new OutOfKeyValueStoreMemoryException(m_memStats.getStatus());
+                throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
             }
 
             // #ifdef STATISTICS
@@ -455,10 +453,10 @@ public class MemoryManagement {
                             m_rawMemory.free(entries[j]);
                         }
 
-                        throw new OutOfKeyValueStoreMemoryException(m_memStats.getStatus());
+                        throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
                     } else {
-                        m_memStats.numActiveChunks++;
-                        m_memStats.totalActiveChunkMemory += p_size;
+                        m_memManagement.memoryInformation.numActiveChunks++;
+                        m_memManagement.memoryInformation.totalActiveChunkMemory += p_size;
                     }
                 }
 
@@ -468,7 +466,7 @@ public class MemoryManagement {
                     m_cidTable.putChunkIDForReuse(lid);
                 }
 
-                throw new OutOfKeyValueStoreMemoryException(m_memStats.getStatus());
+                throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
             }
 
             // #ifdef STATISTICS
@@ -527,16 +525,16 @@ public class MemoryManagement {
 
                 for (int i = 0; i < entries.length; i++) {
                     m_rawMemory.writeBytes(entries[i], 0, p_data, p_offsets[i], p_lengths[i]);
-                    m_memStats.totalActiveChunkMemory += p_lengths[i];
+                    m_memManagement.memoryInformation.totalActiveChunkMemory += p_lengths[i];
                 }
 
-                m_memStats.numActiveChunks += entries.length;
+                m_memManagement.memoryInformation.numActiveChunks += entries.length;
 
                 for (int i = 0; i < entries.length; i++) {
                     m_cidTable.setAndCreate(p_chunkIDs[i], entries[i]);
                 }
             } else {
-                throw new OutOfKeyValueStoreMemoryException(m_memStats.getStatus());
+                throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
             }
 
             // #ifdef STATISTICS
@@ -588,16 +586,16 @@ public class MemoryManagement {
                     SmallObjectHeapDataStructureImExporter exporter = m_memManagement.getImExporter(entries[i]);
                     exporter.exportObject(p_dataStructures[i]);
                     ret += sizes[i];
-                    m_memStats.totalActiveChunkMemory += sizes[i];
+                    m_memManagement.memoryInformation.totalActiveChunkMemory += sizes[i];
                 }
 
-                m_memStats.numActiveChunks += entries.length;
+                m_memManagement.memoryInformation.numActiveChunks += entries.length;
 
                 for (int i = 0; i < entries.length; i++) {
                     m_cidTable.set(p_dataStructures[i].getID(), entries[i]);
                 }
             } else {
-                throw new OutOfKeyValueStoreMemoryException(m_memStats.getStatus());
+                throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
             }
 
             // #ifdef STATISTICS
@@ -674,8 +672,8 @@ public class MemoryManagement {
                     // #ifdef STATISTICS
                     //->SOP_FREE.leave();
                     // #endif /* STATISTICS */
-                    m_memStats.numActiveChunks--;
-                    m_memStats.totalActiveChunkMemory -= ret;
+                    m_memManagement.memoryInformation.numActiveChunks--;
+                    m_memManagement.memoryInformation.totalActiveChunkMemory -= ret;
                 }
 
             } catch (final MemoryRuntimeException e) {
