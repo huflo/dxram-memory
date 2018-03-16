@@ -67,7 +67,7 @@ final class CIDTable {
      * Creates an instance of CIDTable
      *
      * @param p_ownNodeID
-     *     Own node ID
+     *          Own node ID
      */
     CIDTable(final short p_ownNodeID) {
         m_ownNodeID = p_ownNodeID;
@@ -140,6 +140,10 @@ final class CIDTable {
     /**
      * Get a free LID from the CIDTable
      *
+     * @param p_size
+     *          Number of LIDs
+     * @param p_consecutive
+     *          LIDs should be consecutive
      * @return a free LID and version
      */
     long[] getFreeLIDs(final int p_size, final boolean p_consecutive) {
@@ -223,7 +227,7 @@ final class CIDTable {
      * Initializes the CIDTable
      *
      * @param p_rawMemory
-     *     The raw memory instance to use for allocation.
+     *          The raw memory instance to use for allocation.
      */
     void initialize(final SmallObjectHeap p_rawMemory) {
         m_rawMemory = p_rawMemory;
@@ -251,8 +255,8 @@ final class CIDTable {
      * Gets an entry of the level 0 table
      *
      * @param p_chunkID
-     *     the ChunkID of the entry
-     * @return the entry. 0 for invalid/unused.
+     *          The ChunkID of the entry
+     * @return The entry. 0 for invalid/unused.
      */
     long get(final long p_chunkID) {
         return get(getAddressOfEntry(p_chunkID));
@@ -292,13 +296,13 @@ final class CIDTable {
     }
 
     /**
-     * Sets an entry of the level 0 table
+     * Sets an entry of the level 0 table.
      *
      * @param p_chunkID
-     *     the ChunkID of the entry
+     *          The ChunkID of the entry
      * @param p_chunkEntry
-     *     the coded entry of the chunk with the address, a 10 bit space of a length field and different states
-     * @return True if successful, false if allocation of a new table failed, out of memory
+     *          The coded entry of the chunk with the address, a 10 bit space of a length field and different states
+     * @return True if successful, otherwise false
      */
     boolean set(final long p_chunkID, final long p_chunkEntry) {
         return directSet(getAddressOfEntry(p_chunkID), p_chunkEntry);
@@ -321,9 +325,9 @@ final class CIDTable {
      * Gets and deletes an entry of the level 0 table
      *
      * @param p_chunkID
-     *     the ChunkID of the entry
+     *          The ChunkID of the entry
      * @param p_flagZombie
-     *     Flag the deleted entry as a zombie or not zombie i.e. fully deleted.
+     *          Flag the deleted entry as a zombie or not zombie i.e. fully deleted.
      * @return The entry of the chunk which was removed from the table.
      */
     long delete(final long p_chunkID, final boolean p_flagZombie) {
@@ -501,8 +505,10 @@ final class CIDTable {
     /**
      * Get a read lock on a CID
      *
-     * @param p_chunkID the cid we want to lock
-     * @return False if the chunk is no longer active. True on success.
+     * @param p_chunkID
+     *          The cid we want to lock
+     * @return
+     *          False if the chunk is no longer active. True on success.
      */
     final boolean readLock(final long p_chunkID) {
         return directReadLock(getAddressOfEntry(p_chunkID));
