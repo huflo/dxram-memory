@@ -58,20 +58,22 @@ public class MemoryManagement {
     long createIndex(final int p_size) throws OutOfKeyValueStoreMemoryException, MemoryRuntimeException {
         assert p_size > 0;
 
+        long directEntryAddress;
         long entry;
-
         long chunkID;
 
         // #if LOGGER == TRACE
         LOGGER.trace("ENTER createIndex p_size %d", p_size);
         // #endif /* LOGGER == TRACE */
 
-        //get a management lock
-        lockManage();
         try {
-            if (m_cidTable.get(0) != 0) {
+            //get a management lock
+            lockManage();
+
+            directEntryAddress = m_cidTable.getAddressOfEntryCreate(0);
+            if (m_cidTable.directGet(directEntryAddress) != 0) {
                 // delete old entry
-                entry = m_cidTable.delete(0, false);
+                entry = m_cidTable.directDelete(directEntryAddress, false);
 
                 m_rawMemory.free(entry);
                 m_memManagement.memoryInformation.totalActiveChunkMemory -= m_rawMemory.getSizeDataBlock(entry);
@@ -84,7 +86,7 @@ public class MemoryManagement {
                 chunkID = (long) NODE_ID << 48; //<<
 
                 // register new chunk in cid table
-                if (!m_cidTable.set(chunkID, entry)) {
+                if (!m_cidTable.directSet(directEntryAddress, entry)) {
                     // on demand allocation of new table failed
                     // free previously created chunk for data to avoid memory leak
                     m_rawMemory.free(entry);
@@ -133,8 +135,10 @@ public class MemoryManagement {
         LOGGER.trace("ENTER create p_size %d", p_size);
         // #endif /* LOGGER == TRACE */
 
-        lockManage();
         try {
+            //get a management lock
+            lockManage();
+
             // #ifdef STATISTICS
             //->SOP_CREATE.enter();
             // #endif /* STATISTICS */
@@ -180,6 +184,7 @@ public class MemoryManagement {
             MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
             throw e;
         } finally {
+            //do in any case a unlock
             unlockManage();
         }
 
@@ -204,7 +209,7 @@ public class MemoryManagement {
     long create(final long p_chunkId, final int p_size) throws OutOfKeyValueStoreMemoryException, MemoryRuntimeException {
         assert p_size > 0;
 
-        long[] entryPosition;
+        long directEntryAddress;
 
         long chunkID = ChunkID.INVALID_ID;
 
@@ -212,21 +217,23 @@ public class MemoryManagement {
         LOGGER.trace("ENTER create p_chunkId 0x%X, p_size %d", p_chunkId, p_size);
         // #endif /* LOGGER == TRACE */
 
-        lockManage();
         try {
+            //get a management lock
+            lockManage();
+
             // #ifdef STATISTICS
             //->SOP_CREATE.enter();
             // #endif /* STATISTICS */
 
             // verify this id is not used
-            entryPosition = m_cidTable.getAddressOfEntryCreate(p_chunkId);
-            long entry = m_cidTable.get(entryPosition);
+            directEntryAddress = m_cidTable.getAddressOfEntryCreate(p_chunkId);
+            long entry = m_cidTable.directGet(directEntryAddress);
             if (entry == CIDTable.ZOMBIE_ENTRY || entry == CIDTable.FREE_ENTRY) {
                 entry = m_rawMemory.malloc(p_size);
                 if (entry != SmallObjectHeap.INVALID_ADDRESS) {
                     // register new chunk
                     // register new chunk in cid table
-                    if (!m_cidTable.set(entryPosition, entry)) {
+                    if (!m_cidTable.directSet(directEntryAddress, entry)) {
                         // on demand allocation of new table failed
                         // free previously created chunk for data to avoid memory leak
                         m_rawMemory.free(entry);
@@ -248,6 +255,7 @@ public class MemoryManagement {
             MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
             throw e;
         } finally {
+            //do in any case a unlock
             unlockManage();
         }
 
@@ -290,8 +298,10 @@ public class MemoryManagement {
         LOGGER.trace("ENTER createMultiSizes p_consecutive %b, p_sizes %d", p_consecutive, p_sizes.length);
         // #endif /* LOGGER == TRACE */
 
-        lockManage();
         try {
+            //get a management lock
+            lockManage();
+
             // #ifdef STATISTICS
             //->SOP_MULTI_CREATE.enter();
             // #endif /* STATISTICS */
@@ -329,8 +339,8 @@ public class MemoryManagement {
 
             } else {
                 // put lids back
-                for (int i = 0; i < lids.length; i++) {
-                    m_cidTable.putChunkIDForReuse(lids[i]);
+                for (long lid : lids) {
+                    m_cidTable.putChunkIDForReuse(lid);
                 }
 
                 throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
@@ -343,6 +353,7 @@ public class MemoryManagement {
             MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
             throw e;
         } finally {
+            //do in any case a unlock
             unlockManage();
         }
 
@@ -421,8 +432,10 @@ public class MemoryManagement {
         LOGGER.trace("ENTER createMultiSizes p_size %d, p_count %d, p_consecutive %b", p_size, p_count, p_consecutive);
         // #endif /* LOGGER == TRACE */
 
-        lockManage();
         try {
+            //get a management lock
+            lockManage();
+
             // #ifdef STATISTICS
             //->SOP_MULTI_CREATE.enter();
             // #endif /* STATISTICS */
@@ -476,6 +489,7 @@ public class MemoryManagement {
             MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
             throw e;
         } finally {
+            //do in any case a unlock
             unlockManage();
         }
 
@@ -501,7 +515,6 @@ public class MemoryManagement {
      * @param p_usedEntries
      *         Specifies the actual number of slots used in the array (may be less than p_lengths)
      */
-    //TODO testing locks
     void createAndPutRecovered(final long[] p_chunkIDs, final byte[] p_data, final int[] p_offsets, final int[] p_lengths, final int p_usedEntries) {
         long[] entries;
 
@@ -510,6 +523,9 @@ public class MemoryManagement {
         // #endif /* LOGGER == TRACE */
 
         try {
+            //get a management lock
+            lockManage();
+
             // #ifdef STATISTICS
             //->SOP_CREATE_PUT_RECOVERED.enter(p_usedEntries);
             // #endif /* STATISTICS */
@@ -543,6 +559,9 @@ public class MemoryManagement {
         } catch (final MemoryRuntimeException e) {
             MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
             throw e;
+        } finally {
+            //do in any case a unlock
+            unlockManage();
         }
 
         // #if LOGGER == TRACE
@@ -558,7 +577,6 @@ public class MemoryManagement {
      *         All data structure to create and put
      * @return number of written bytes
      */
-    //TODO LOCKS
     int createAndPutRecovered(final DataStructure... p_dataStructures) {
         int ret = 0;
         long[] entries;
@@ -569,6 +587,9 @@ public class MemoryManagement {
         }
 
         try {
+            //get a management lock
+            lockManage();
+
             // #ifdef STATISTICS
             //->SOP_CREATE_PUT_RECOVERED.enter(p_dataStructures.length);
             // #endif /* STATISTICS */
@@ -604,6 +625,9 @@ public class MemoryManagement {
         } catch (final MemoryRuntimeException e) {
             MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
             throw e;
+        } finally {
+            //do in any case a unlock
+            unlockManage();
         }
 
         return ret;
@@ -622,7 +646,7 @@ public class MemoryManagement {
      */
     int remove(final long p_chunkID, final boolean p_wasMigrated) {
         int ret = (int) ChunkID.INVALID_ID;
-        long[] entryPosition;
+        long directEntryAddress;
         long entry;
 
         // #if LOGGER == TRACE
@@ -630,16 +654,18 @@ public class MemoryManagement {
         // #endif /* LOGGER == TRACE */
 
         if (p_chunkID != ChunkID.INVALID_ID &&
-                (entryPosition = m_cidTable.getAddressOfEntry(p_chunkID)) != null &&
-                m_memManagement.writeLock(entryPosition)) {
-            lockManage();
+                (directEntryAddress = m_cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS &&
+                m_memManagement.switchableWriteLock(directEntryAddress)) {
             try {
+                //get a management lock
+                lockManage();
+
                 // #ifdef STATISTICS
                 //->SOP_REMOVE.enter();
                 // #endif /* STATISTICS */
 
                 // Get and delete the address from the CIDTable, mark as zombie first
-                entry = m_cidTable.get(entryPosition);
+                entry = m_cidTable.directGet(directEntryAddress);
                 if(STATE_NOT_MOVEABLE.get(entry) || STATE_NOT_REMOVEABLE.get(entry)){
                     unlockManage();
                     LOGGER.info("CID: %d is not remove able!!!!", p_chunkID);
@@ -649,7 +675,7 @@ public class MemoryManagement {
                 if(entry == CIDTable.ZOMBIE_ENTRY || entry == CIDTable.FREE_ENTRY) {
                     unlockManage();
                 } else {
-                    m_cidTable.set(entryPosition, CIDTable.ZOMBIE_ENTRY);
+                    m_cidTable.directSet(directEntryAddress, CIDTable.ZOMBIE_ENTRY);
 
                     if (p_wasMigrated) {
                         // deleted and previously migrated chunks don't end up in the LID store
@@ -680,7 +706,8 @@ public class MemoryManagement {
                 MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
                 throw e;
             } finally {
-                m_memManagement.writeUnlock(entryPosition);
+                //do in any case a unlock
+                m_memManagement.switchableWriteUnlock(directEntryAddress);
                 unlockManage();
             }
         }
@@ -694,11 +721,9 @@ public class MemoryManagement {
     }
 
     /**
-     * Lock the memory for a management task (create, put, remove).
+     * Lock the memory for a management task (create, remove).
      */
     private void lockManage() {
-        //m_lock.writeLock().lock();
-
         do {
             int v = m_lock.get();
             m_lock.compareAndSet(v, v | 0x40000000);
@@ -709,8 +734,6 @@ public class MemoryManagement {
      * Unlock the memory after a management task (create, put, remove).
      */
     private void unlockManage() {
-        //m_lock.writeLock().unlock();
-
         m_lock.set(0);
     }
 }

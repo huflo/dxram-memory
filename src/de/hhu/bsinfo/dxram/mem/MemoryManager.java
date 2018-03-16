@@ -519,17 +519,17 @@ public class MemoryManager {
      * setLocks.
      *
      *
-     * @param p_entryPosition
-     *              Position of the CIDTable entry
+     * @param p_directEntryAddress
+     *          Direct address of the table entry
      * @return
      *          True if a lock is received, else false
      *
      */
-    boolean readLock(final long[] p_entryPosition){
+    boolean switchableReadLock(final long p_directEntryAddress){
         if(m_readLock)
-            return cidTable.readLock(p_entryPosition);
+            return cidTable.readLock(p_directEntryAddress);
         else
-            return cidTable.writeLock(p_entryPosition);
+            return cidTable.writeLock(p_directEntryAddress);
     }
 
     /**
@@ -537,17 +537,17 @@ public class MemoryManager {
      * setLocks.
      *
      *
-     * @param p_entryPosition
-     *              Position of the CIDTable entry
+     * @param p_directEntryAddress
+     *          Direct address of the table entry
      * @return
      *          True if a unlock was successful, else false
      *
      */
-    boolean readUnlock(final long[] p_entryPosition){
+    boolean switchableReadUnlock(final long p_directEntryAddress){
         if(m_readLock)
-            return cidTable.readUnlock(p_entryPosition);
+            return cidTable.readUnlock(p_directEntryAddress);
         else
-            return cidTable.writeUnlock(p_entryPosition);
+            return cidTable.writeUnlock(p_directEntryAddress);
     }
 
     /**
@@ -555,17 +555,17 @@ public class MemoryManager {
      * setLocks.
      *
      *
-     * @param p_entryPosition
-     *              Position of the CIDTable entry
+     * @param p_directEntryAddress
+     *          Direct address of the table entry
      * @return
      *          True if a lock is received, else false
      *
      */
-    boolean writeLock(final long[] p_entryPosition){
+    boolean switchableWriteLock(final long p_directEntryAddress){
         if(m_writeLock)
-            return cidTable.writeLock(p_entryPosition);
+            return cidTable.writeLock(p_directEntryAddress);
         else
-            return cidTable.readLock(p_entryPosition);
+            return cidTable.readLock(p_directEntryAddress);
     }
 
     /**
@@ -573,17 +573,17 @@ public class MemoryManager {
      * setLocks.
      *
      *
-     * @param p_entryPosition
-     *              Position of the CIDTable entry
+     * @param p_directEntryAddress
+     *          Direct address of the table entry
      * @return
      *          True if a unlock was successful, else false
      *
      */
-    boolean writeUnlock(final long[] p_entryPosition){
+    boolean switchableWriteUnlock(final long p_directEntryAddress){
         if(m_writeLock)
-            return cidTable.writeUnlock(p_entryPosition);
+            return cidTable.writeUnlock(p_directEntryAddress);
         else
-            return cidTable.readUnlock(p_entryPosition);
+            return cidTable.readUnlock(p_directEntryAddress);
     }
 
 

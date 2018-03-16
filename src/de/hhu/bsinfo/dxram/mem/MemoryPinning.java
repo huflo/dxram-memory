@@ -1,7 +1,5 @@
 package de.hhu.bsinfo.dxram.mem;
 
-import java.util.Arrays;
-
 import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.*;
 
 /**
@@ -31,10 +29,10 @@ public class MemoryPinning {
      * @return The CIDTable entry
      */
     public long pinChunk(final long chunkID){
-        long[] entryPosition = cidTable.getAddressOfEntry(chunkID);
+        long directEntryAddress = cidTable.getAddressOfEntry(chunkID);
 
-        if(cidTable.setState(entryPosition, STATE_NOT_MOVEABLE, true)){
-            return WRITE_ACCESS.set(READ_ACCESS.set(cidTable.get(entryPosition), 0), false);
+        if(cidTable.directSetState(directEntryAddress, STATE_NOT_MOVEABLE, true)){
+            return WRITE_ACCESS.set(READ_ACCESS.set(cidTable.directGet(directEntryAddress), 0), false);
         }
 
         return 0;
