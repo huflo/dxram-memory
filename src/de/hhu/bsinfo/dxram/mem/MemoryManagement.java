@@ -20,9 +20,9 @@ import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.STATE_NOT_REMOVEABLE;
 public class MemoryManagement {
     private static final Logger LOGGER = LogManager.getFormatterLogger(MemoryManagement.class.getSimpleName());
 
-    private final MemoryManager m_memManagement;
-    private final SmallObjectHeap m_rawMemory;
-    private final CIDTable m_cidTable;
+    private final MemoryManager memory;
+    private final SmallObjectHeap smallObjectHeap;
+    private final CIDTable cidTable;
     private final short NODE_ID;
 
     private AtomicInteger m_lock;
@@ -35,11 +35,11 @@ public class MemoryManagement {
      *
      */
     MemoryManagement(MemoryManager memoryManager) {
-        m_memManagement = memoryManager;
-        m_rawMemory = memoryManager.smallObjectHeap;
-        m_cidTable = memoryManager.cidTable;
+        memory = memoryManager;
+        smallObjectHeap = memoryManager.smallObjectHeap;
+        cidTable = memoryManager.cidTable;
 
-        NODE_ID = m_cidTable.m_ownNodeID;
+        NODE_ID = cidTable.m_ownNodeID;
 
         m_lock = new AtomicInteger(0);
     }
@@ -70,36 +70,36 @@ public class MemoryManagement {
             //get a management lock
             lockManage();
 
-            directEntryAddress = m_cidTable.getAddressOfEntryCreate(0);
-            if (m_cidTable.directGet(directEntryAddress) != 0) {
+            directEntryAddress = cidTable.getAddressOfEntryCreate(0);
+            if (cidTable.directGet(directEntryAddress) != 0) {
                 // delete old entry
-                entry = m_cidTable.directDelete(directEntryAddress, false);
+                entry = cidTable.directDelete(directEntryAddress, false);
 
-                m_rawMemory.free(entry);
-                m_memManagement.memoryInformation.totalActiveChunkMemory -= m_rawMemory.getSizeDataBlock(entry);
-                m_memManagement.memoryInformation.numActiveChunks--;
+                smallObjectHeap.free(entry);
+                memory.info.totalActiveChunkMemory -= smallObjectHeap.getSizeDataBlock(entry);
+                memory.info.numActiveChunks--;
             }
 
-            entry = m_rawMemory.malloc(p_size);
+            entry = smallObjectHeap.malloc(p_size);
             if (entry > SmallObjectHeap.INVALID_ADDRESS) {
                 //->chunkID = (long) m_boot.getNodeID() << 48;
                 chunkID = (long) NODE_ID << 48; //<<
 
                 // register new chunk in cid table
-                if (!m_cidTable.directSet(directEntryAddress, entry)) {
+                if (!cidTable.directSet(directEntryAddress, entry)) {
                     // on demand allocation of new table failed
                     // free previously created chunk for data to avoid memory leak
-                    m_rawMemory.free(entry);
-                    throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
+                    smallObjectHeap.free(entry);
+                    throw new OutOfKeyValueStoreMemoryException(memory.info.getStatus());
                 } else {
-                    m_memManagement.memoryInformation.numActiveChunks++;
-                    m_memManagement.memoryInformation.totalActiveChunkMemory += p_size;
+                    memory.info.numActiveChunks++;
+                    memory.info.totalActiveChunkMemory += p_size;
                 }
             } else {
-                throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
+                throw new OutOfKeyValueStoreMemoryException(memory.info.getStatus());
             }
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         } finally {
             //do in any case a unlock
@@ -144,13 +144,13 @@ public class MemoryManagement {
             // #endif /* STATISTICS */
 
             // get new LID from CIDTable
-            lid = m_cidTable.getFreeLID();
+            lid = cidTable.getFreeLID();
 
             // first, try to allocate. maybe early return
             // #ifdef STATISTICS
             //->SOP_MALLOC.enter(p_size);
             // #endif /* STATISTICS */
-            entry= m_rawMemory.malloc(p_size);
+            entry= smallObjectHeap.malloc(p_size);
             // #ifdef STATISTICS
             //->SOP_MALLOC.leave();
             // #endif /* STATISTICS */
@@ -159,29 +159,29 @@ public class MemoryManagement {
                 chunkID = ((long) NODE_ID << 48) + lid;//<<
 
                 // register new chunk in cid table
-                if (!m_cidTable.setAndCreate(chunkID, entry)) {
+                if (!cidTable.setAndCreate(chunkID, entry)) {
                     // on demand allocation of new table failed
                     // free previously created chunk for data to avoid memory leak
-                    m_rawMemory.free(entry);
+                    smallObjectHeap.free(entry);
 
                     //LOGGER.warn("OutOfKeyValueStoreMemory");
-                    //throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
+                    //throw new OutOfKeyValueStoreMemoryException(memory.info.getStatus());
                 } else {
-                    m_memManagement.memoryInformation.numActiveChunks++;
-                    m_memManagement.memoryInformation.totalActiveChunkMemory += p_size;
+                    memory.info.numActiveChunks++;
+                    memory.info.totalActiveChunkMemory += p_size;
                 }
             } else {
                 // put lid back
-                m_cidTable.putChunkIDForReuse(lid);
+                cidTable.putChunkIDForReuse(lid);
                 //LOGGER.warn("OutOfKeyValueStoreMemory");
-                //throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
+                //throw new OutOfKeyValueStoreMemoryException(memory.info.getStatus());
             }
 
             // #ifdef STATISTICS
             //->SOP_CREATE.leave();
             // #endif /* STATISTICS */
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         } finally {
             //do in any case a unlock
@@ -226,25 +226,25 @@ public class MemoryManagement {
             // #endif /* STATISTICS */
 
             // verify this id is not used
-            directEntryAddress = m_cidTable.getAddressOfEntryCreate(p_chunkId);
-            long entry = m_cidTable.directGet(directEntryAddress);
+            directEntryAddress = cidTable.getAddressOfEntryCreate(p_chunkId);
+            long entry = cidTable.directGet(directEntryAddress);
             if (entry == CIDTable.ZOMBIE_ENTRY || entry == CIDTable.FREE_ENTRY) {
-                entry = m_rawMemory.malloc(p_size);
+                entry = smallObjectHeap.malloc(p_size);
                 if (entry != SmallObjectHeap.INVALID_ADDRESS) {
                     // register new chunk
                     // register new chunk in cid table
-                    if (!m_cidTable.directSet(directEntryAddress, entry)) {
+                    if (!cidTable.directSet(directEntryAddress, entry)) {
                         // on demand allocation of new table failed
                         // free previously created chunk for data to avoid memory leak
-                        m_rawMemory.free(entry);
-                        throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
+                        smallObjectHeap.free(entry);
+                        throw new OutOfKeyValueStoreMemoryException(memory.info.getStatus());
                     } else {
-                        m_memManagement.memoryInformation.numActiveChunks++;
-                        m_memManagement.memoryInformation.totalActiveChunkMemory += p_size;
+                        memory.info.numActiveChunks++;
+                        memory.info.totalActiveChunkMemory += p_size;
                         chunkID = p_chunkId;
                     }
                 } else {
-                    throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
+                    throw new OutOfKeyValueStoreMemoryException(memory.info.getStatus());
                 }
             }
 
@@ -252,7 +252,7 @@ public class MemoryManagement {
             //->SOP_CREATE.leave();
             // #endif /* STATISTICS */
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         } finally {
             //do in any case a unlock
@@ -307,12 +307,12 @@ public class MemoryManagement {
             // #endif /* STATISTICS */
 
             // get new LIDs
-            lids = m_cidTable.getFreeLIDs(p_sizes.length, p_consecutive);
+            lids = cidTable.getFreeLIDs(p_sizes.length, p_consecutive);
 
             // #ifdef STATISTICS
             //->SOP_MULTI_MALLOC.enter(p_sizes.length);
             // #endif /* STATISTICS */
-            entries = m_rawMemory.multiMallocSizes(p_sizes);
+            entries = smallObjectHeap.multiMallocSizes(p_sizes);
             // #ifdef STATISTICS
             //->SOP_MULTI_MALLOC.leave();
             // #endif /* STATISTICS */
@@ -323,34 +323,34 @@ public class MemoryManagement {
                     lids[i] = ((long) NODE_ID << 48) + lids[i];//<<
 
                     // register new chunk in cid table
-                    if (!m_cidTable.setAndCreate(lids[i], entries[i])) {
+                    if (!cidTable.setAndCreate(lids[i], entries[i])) {
                         for (int j = i; j >= 0; j--) {
                             // on demand allocation of new table failed
                             // free previously created chunk for data to avoid memory leak
-                            m_rawMemory.free(entries[j]);
+                            smallObjectHeap.free(entries[j]);
                         }
 
-                        throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
+                        throw new OutOfKeyValueStoreMemoryException(memory.info.getStatus());
                     } else {
-                        m_memManagement.memoryInformation.numActiveChunks++;
-                        m_memManagement.memoryInformation.totalActiveChunkMemory += p_sizes[i];
+                        memory.info.numActiveChunks++;
+                        memory.info.totalActiveChunkMemory += p_sizes[i];
                     }
                 }
 
             } else {
                 // put lids back
                 for (long lid : lids) {
-                    m_cidTable.putChunkIDForReuse(lid);
+                    cidTable.putChunkIDForReuse(lid);
                 }
 
-                throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
+                throw new OutOfKeyValueStoreMemoryException(memory.info.getStatus());
             }
 
             // #ifdef STATISTICS
             //->SOP_MULTI_CREATE.leave();
             // #endif /* STATISTICS */
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         } finally {
             //do in any case a unlock
@@ -441,13 +441,13 @@ public class MemoryManagement {
             // #endif /* STATISTICS */
 
             // get new LIDs
-            lids = m_cidTable.getFreeLIDs(p_count, p_consecutive);
+            lids = cidTable.getFreeLIDs(p_count, p_consecutive);
 
             // first, try to allocate. maybe early return
             // #ifdef STATISTICS
             //->SOP_MULTI_MALLOC.enter(p_size);
             // #endif /* STATISTICS */
-            entries = m_rawMemory.multiMalloc(p_size, p_count);
+            entries = smallObjectHeap.multiMalloc(p_size, p_count);
             // #ifdef STATISTICS
             //->SOP_MULTI_MALLOC.leave();
             // #endif /* STATISTICS */
@@ -458,35 +458,35 @@ public class MemoryManagement {
                     lids[i] = ((long) NODE_ID << 48) + lids[i];//<<
 
                     // register new chunk in cid table
-                    if (!m_cidTable.setAndCreate(lids[i], entries[i])) {
+                    if (!cidTable.setAndCreate(lids[i], entries[i])) {
 
                         for (int j = i; j >= 0; j--) {
                             // on demand allocation of new table failed
                             // free previously created chunk for data to avoid memory leak
-                            m_rawMemory.free(entries[j]);
+                            smallObjectHeap.free(entries[j]);
                         }
 
-                        throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
+                        throw new OutOfKeyValueStoreMemoryException(memory.info.getStatus());
                     } else {
-                        m_memManagement.memoryInformation.numActiveChunks++;
-                        m_memManagement.memoryInformation.totalActiveChunkMemory += p_size;
+                        memory.info.numActiveChunks++;
+                        memory.info.totalActiveChunkMemory += p_size;
                     }
                 }
 
             } else {
                 // put lids back
                 for (long lid : lids) {
-                    m_cidTable.putChunkIDForReuse(lid);
+                    cidTable.putChunkIDForReuse(lid);
                 }
 
-                throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
+                throw new OutOfKeyValueStoreMemoryException(memory.info.getStatus());
             }
 
             // #ifdef STATISTICS
             //->SOP_MULTI_CREATE.leave();
             // #endif /* STATISTICS */
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         } finally {
             //do in any case a unlock
@@ -533,31 +533,31 @@ public class MemoryManagement {
             // #ifdef STATISTICS
             //->SOP_MULTI_MALLOC.enter(p_usedEntries);
             // #endif /* STATISTICS */
-            entries = m_rawMemory.multiMallocSizesUsedEntries(p_usedEntries, p_lengths);
+            entries = smallObjectHeap.multiMallocSizesUsedEntries(p_usedEntries, p_lengths);
             // #ifdef STATISTICS
             //->SOP_MULTI_MALLOC.leave();
             // #endif /* STATISTICS */
             if (entries != null) {
 
                 for (int i = 0; i < entries.length; i++) {
-                    m_rawMemory.writeBytes(entries[i], 0, p_data, p_offsets[i], p_lengths[i]);
-                    m_memManagement.memoryInformation.totalActiveChunkMemory += p_lengths[i];
+                    smallObjectHeap.writeBytes(entries[i], 0, p_data, p_offsets[i], p_lengths[i]);
+                    memory.info.totalActiveChunkMemory += p_lengths[i];
                 }
 
-                m_memManagement.memoryInformation.numActiveChunks += entries.length;
+                memory.info.numActiveChunks += entries.length;
 
                 for (int i = 0; i < entries.length; i++) {
-                    m_cidTable.setAndCreate(p_chunkIDs[i], entries[i]);
+                    cidTable.setAndCreate(p_chunkIDs[i], entries[i]);
                 }
             } else {
-                throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
+                throw new OutOfKeyValueStoreMemoryException(memory.info.getStatus());
             }
 
             // #ifdef STATISTICS
             //->SOP_CREATE_PUT_RECOVERED.leave();
             // #endif /* STATISTICS */
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         } finally {
             //do in any case a unlock
@@ -597,33 +597,33 @@ public class MemoryManagement {
             // #ifdef STATISTICS
             //->SOP_MULTI_MALLOC.enter(p_dataStructures.length);
             // #endif /* STATISTICS */
-            entries = m_rawMemory.multiMallocSizes(sizes);
+            entries = smallObjectHeap.multiMallocSizes(sizes);
             // #ifdef STATISTICS
             //->SOP_MULTI_MALLOC.leave();
             // #endif /* STATISTICS */
             if (entries != null) {
 
                 for (int i = 0; i < entries.length; i++) {
-                    SmallObjectHeapDataStructureImExporter exporter = m_memManagement.getImExporter(entries[i]);
+                    SmallObjectHeapDataStructureImExporter exporter = memory.getImExporter(entries[i]);
                     exporter.exportObject(p_dataStructures[i]);
                     ret += sizes[i];
-                    m_memManagement.memoryInformation.totalActiveChunkMemory += sizes[i];
+                    memory.info.totalActiveChunkMemory += sizes[i];
                 }
 
-                m_memManagement.memoryInformation.numActiveChunks += entries.length;
+                memory.info.numActiveChunks += entries.length;
 
                 for (int i = 0; i < entries.length; i++) {
-                    m_cidTable.set(p_dataStructures[i].getID(), entries[i]);
+                    cidTable.set(p_dataStructures[i].getID(), entries[i]);
                 }
             } else {
-                throw new OutOfKeyValueStoreMemoryException(m_memManagement.memoryInformation.getStatus());
+                throw new OutOfKeyValueStoreMemoryException(memory.info.getStatus());
             }
 
             // #ifdef STATISTICS
             //->SOP_CREATE_PUT_RECOVERED.leave();
             // #endif /* STATISTICS */
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         } finally {
             //do in any case a unlock
@@ -654,8 +654,8 @@ public class MemoryManagement {
         // #endif /* LOGGER == TRACE */
 
         if (p_chunkID != ChunkID.INVALID_ID &&
-                (directEntryAddress = m_cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS &&
-                m_memManagement.switchableWriteLock(directEntryAddress)) {
+                (directEntryAddress = cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS &&
+                memory.switchableWriteLock(directEntryAddress)) {
             try {
                 //get a management lock
                 lockManage();
@@ -665,7 +665,7 @@ public class MemoryManagement {
                 // #endif /* STATISTICS */
 
                 // Get and delete the address from the CIDTable, mark as zombie first
-                entry = m_cidTable.directGet(directEntryAddress);
+                entry = cidTable.directGet(directEntryAddress);
                 if(STATE_NOT_MOVEABLE.get(entry) || STATE_NOT_REMOVEABLE.get(entry)){
                     unlockManage();
                     LOGGER.info("CID: %d is not remove able!!!!", p_chunkID);
@@ -675,39 +675,39 @@ public class MemoryManagement {
                 if(entry == CIDTable.ZOMBIE_ENTRY || entry == CIDTable.FREE_ENTRY) {
                     unlockManage();
                 } else {
-                    m_cidTable.directSet(directEntryAddress, CIDTable.ZOMBIE_ENTRY);
+                    cidTable.directSet(directEntryAddress, CIDTable.ZOMBIE_ENTRY);
 
                     if (p_wasMigrated) {
                         // deleted and previously migrated chunks don't end up in the LID store
-                        m_cidTable.set(p_chunkID, CIDTable.FREE_ENTRY);
+                        cidTable.set(p_chunkID, CIDTable.FREE_ENTRY);
                     } else {
                         // more space for another zombie for reuse in LID store?
-                        if (m_cidTable.putChunkIDForReuse(ChunkID.getLocalID(p_chunkID))) {
+                        if (cidTable.putChunkIDForReuse(ChunkID.getLocalID(p_chunkID))) {
                             // kill zombie entry
-                            m_cidTable.set(p_chunkID, CIDTable.FREE_ENTRY);
+                            cidTable.set(p_chunkID, CIDTable.FREE_ENTRY);
                         } else {
                             // no space for zombie in LID store, keep him "alive" in table
                         }
                     }
-                    ret = m_rawMemory.getSizeDataBlock(entry);
+                    ret = smallObjectHeap.getSizeDataBlock(entry);
                     //System.out.println(String.format("0x%X , %d\n%s", entry, ret, CIDTableEntry.entryData(entry)));
                     // #ifdef STATISTICS
                     //->SOP_FREE.enter(ret);
                     // #endif /* STATISTICS */
-                    m_rawMemory.free(entry);
+                    smallObjectHeap.free(entry);
                     // #ifdef STATISTICS
                     //->SOP_FREE.leave();
                     // #endif /* STATISTICS */
-                    m_memManagement.memoryInformation.numActiveChunks--;
-                    m_memManagement.memoryInformation.totalActiveChunkMemory -= ret;
+                    memory.info.numActiveChunks--;
+                    memory.info.totalActiveChunkMemory -= ret;
                 }
 
             } catch (final MemoryRuntimeException e) {
-                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+                MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
                 throw e;
             } finally {
                 //do in any case a unlock
-                m_memManagement.switchableWriteUnlock(directEntryAddress);
+                memory.switchableWriteUnlock(directEntryAddress);
                 unlockManage();
             }
         }

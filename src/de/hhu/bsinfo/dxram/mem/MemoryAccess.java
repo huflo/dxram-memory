@@ -25,9 +25,9 @@ import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.*;
 public class MemoryAccess {
     private static final Logger LOGGER = LogManager.getFormatterLogger(MemoryAccess.class.getSimpleName());
 
-    private final MemoryManager m_memManager;
-    private final SmallObjectHeap m_rawMemory;
-    private final CIDTable m_cidTable;
+    private final MemoryManager memory;
+    private final SmallObjectHeap smallObjectHeap;
+    private final CIDTable cidTable;
 
     /**
      * Constructor
@@ -36,9 +36,9 @@ public class MemoryAccess {
      *          The central unit which manages all memory accesses
      */
     MemoryAccess(final MemoryManager memoryManager) {
-        m_memManager = memoryManager;
-        m_rawMemory = memoryManager.smallObjectHeap;
-        m_cidTable = memoryManager.cidTable;
+        memory = memoryManager;
+        smallObjectHeap = memoryManager.smallObjectHeap;
+        cidTable = memoryManager.cidTable;
     }
 
     //GET---------------------------------------------------------------------------------------------------------------
@@ -65,21 +65,21 @@ public class MemoryAccess {
 
         if (p_dataStructure.getID() == ChunkID.INVALID_ID) { //Check if CID can be correct
             p_dataStructure.setState(ChunkState.INVALID_ID);
-        } else if ((directEntryAddress = m_cidTable.getAddressOfEntry(p_dataStructure.getID())) == SmallObjectHeap.INVALID_ADDRESS) { //Check if a CID exist
+        } else if ((directEntryAddress = cidTable.getAddressOfEntry(p_dataStructure.getID())) == SmallObjectHeap.INVALID_ADDRESS) { //Check if a CID exist
             p_dataStructure.setState(ChunkState.DOES_NOT_EXIST);
-        } else if (m_cidTable.directReadLock(directEntryAddress)) { //check if a lock was received
+        } else if (cidTable.directReadLock(directEntryAddress)) { //check if a lock was received
             try {
 
                 // #ifdef STATISTICS
                 //->SOP_GET.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.directGet(directEntryAddress);
+                entry = cidTable.directGet(directEntryAddress);
                 if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                    assert m_rawMemory.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
+                    assert smallObjectHeap.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
 
                     // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(entry);
+                    SmallObjectHeapDataStructureImExporter importer = memory.getImExporter(entry);
                     importer.importObject(p_dataStructure);
 
                     p_dataStructure.setState(ChunkState.OK);
@@ -93,10 +93,10 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
             } catch (final MemoryRuntimeException e) {
-                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+                MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
                 throw e;
             } finally {
-                m_cidTable.directReadUnlock(directEntryAddress);
+                cidTable.directReadUnlock(directEntryAddress);
             }
         }
 
@@ -134,13 +134,13 @@ public class MemoryAccess {
 
         if (chunkID == ChunkID.INVALID_ID) { //Check if CID can be correct
             p_dataStructure.setState(ChunkState.INVALID_ID);
-        } else if ((directEntryAddress = m_cidTable.getAddressOfEntry(chunkID)) != SmallObjectHeap.INVALID_ADDRESS ) { //Check if a CID exist
+        } else if ((directEntryAddress = cidTable.getAddressOfEntry(chunkID)) != SmallObjectHeap.INVALID_ADDRESS ) { //Check if a CID exist
             p_dataStructure.setState(ChunkState.DOES_NOT_EXIST);
         } else {
             if (p_acquireWriteLock)
-                gotLock = m_cidTable.directWriteLock(directEntryAddress);
+                gotLock = cidTable.directWriteLock(directEntryAddress);
             else
-                gotLock = m_cidTable.directReadLock(directEntryAddress);
+                gotLock = cidTable.directReadLock(directEntryAddress);
 
 
             if (gotLock) { //check if a lock was received
@@ -149,12 +149,12 @@ public class MemoryAccess {
                     //->SOP_GET.enter();
                     // #endif /* STATISTICS */
 
-                    entry = m_cidTable.directGet(directEntryAddress);
+                    entry = cidTable.directGet(directEntryAddress);
                     if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                        assert m_rawMemory.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
+                        assert smallObjectHeap.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
 
                         // pool the im/exporters
-                        SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(entry);
+                        SmallObjectHeapDataStructureImExporter importer = memory.getImExporter(entry);
                         importer.importObject(p_dataStructure);
 
                         p_dataStructure.setState(ChunkState.OK);
@@ -168,13 +168,13 @@ public class MemoryAccess {
                     // #endif /* STATISTICS */
 
                 } catch (final MemoryRuntimeException e) {
-                    MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+                    MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
                     if (p_acquireWriteLock)
-                        m_cidTable.directWriteUnlock(directEntryAddress);
+                        cidTable.directWriteUnlock(directEntryAddress);
                     throw e;
                 } finally {
                     if (!p_acquireWriteLock)
-                        m_cidTable.directReadUnlock(directEntryAddress);
+                        cidTable.directReadUnlock(directEntryAddress);
                 }
             }
         }
@@ -209,22 +209,21 @@ public class MemoryAccess {
         // #endif /* LOGGER == TRACE */
 
         if (p_chunkID != ChunkID.INVALID_ID && //Check if CID can be correct
-                (directEntryAddress = m_cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS && //Check if a CID exist
-                m_memManager.switchableReadLock(directEntryAddress)) { //check if a lock was received
-
+                (directEntryAddress = cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS && //Check if a CID exist
+                memory.switchableReadLock(directEntryAddress)) { //check if a lock was received
             try {
 
                 // #ifdef STATISTICS
                 //->SOP_GET.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.directGet(directEntryAddress);
+                entry = cidTable.directGet(directEntryAddress);
                 if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                    int chunkSize = m_rawMemory.getSizeDataBlock(entry);
+                    int chunkSize = smallObjectHeap.getSizeDataBlock(entry);
                     ret = new byte[chunkSize];
 
                     // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(entry);
+                    SmallObjectHeapDataStructureImExporter importer = memory.getImExporter(entry);
                     int retSize = importer.readBytes(ret);
                     if (retSize != chunkSize) {
                         //->throw new DXRAMRuntimeException("Unknown error, importer size " + retSize + " != chunk size " + chunkSize);
@@ -237,10 +236,10 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
             } catch (final MemoryRuntimeException e) {
-                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+                MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
                 throw e;
             } finally {
-                m_memManager.switchableReadUnlock(directEntryAddress);
+                memory.switchableReadUnlock(directEntryAddress);
             }
         }
 
@@ -274,11 +273,11 @@ public class MemoryAccess {
         LOGGER.trace("ENTER get p_chunkID 0x%X", p_chunkID);
         // #endif /* LOGGER == TRACE */
 
-        if ((directEntryAddress = m_cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS) { //Check if a CID exist
+        if ((directEntryAddress = cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS) { //Check if a CID exist
             if (p_acquireWriteLock)
-                gotLock = m_cidTable.directWriteLock(directEntryAddress);
+                gotLock = cidTable.directWriteLock(directEntryAddress);
             else
-                gotLock = m_cidTable.directReadLock(directEntryAddress);
+                gotLock = cidTable.directReadLock(directEntryAddress);
         }
 
         if (gotLock) { //check if a lock was received
@@ -288,13 +287,13 @@ public class MemoryAccess {
                 //->SOP_GET.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.directGet(directEntryAddress);
+                entry = cidTable.directGet(directEntryAddress);
                 if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                    int chunkSize = m_rawMemory.getSizeDataBlock(entry);
+                    int chunkSize = smallObjectHeap.getSizeDataBlock(entry);
                     ret = new byte[chunkSize];
 
                     // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(entry);
+                    SmallObjectHeapDataStructureImExporter importer = memory.getImExporter(entry);
                     int retSize = importer.readBytes(ret);
                     if (retSize != chunkSize) {
                         //->throw new DXRAMRuntimeException("Unknown error, importer size " + retSize + " != chunk size " + chunkSize);
@@ -308,13 +307,13 @@ public class MemoryAccess {
 
             } catch (final MemoryRuntimeException e) {
                 if (p_acquireWriteLock)
-                    m_cidTable.directWriteUnlock(directEntryAddress);
+                    cidTable.directWriteUnlock(directEntryAddress);
 
-                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+                MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
                 throw e;
             } finally {
                 if (!p_acquireWriteLock)
-                    m_cidTable.directReadUnlock(directEntryAddress);
+                    cidTable.directReadUnlock(directEntryAddress);
             }
         }
 
@@ -349,14 +348,14 @@ public class MemoryAccess {
         boolean gotLock;
 
         //Check if a CID exist
-        if ((directEntryAddress = m_cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS) {
+        if ((directEntryAddress = cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS) {
             return -1;
         }
 
         if (p_acquireWriteLock)
-            gotLock = m_cidTable.directWriteLock(directEntryAddress);
+            gotLock = cidTable.directWriteLock(directEntryAddress);
         else
-            gotLock = m_cidTable.directReadLock(directEntryAddress);
+            gotLock = cidTable.directReadLock(directEntryAddress);
 
         //check if a lock was received
         if (gotLock) {
@@ -365,15 +364,15 @@ public class MemoryAccess {
                 //->SOP_GET.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.directGet(directEntryAddress);
+                entry = cidTable.directGet(directEntryAddress);
                 if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                    int chunkSize = m_rawMemory.getSizeDataBlock(entry);
+                    int chunkSize = smallObjectHeap.getSizeDataBlock(entry);
 
                     if (p_offset + chunkSize > p_bufferSize) {
                         ret = 0;
                     } else {
                         // pool the im/exporters
-                        SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(entry);
+                        SmallObjectHeapDataStructureImExporter importer = memory.getImExporter(entry);
                         ret = importer.readBytes(p_buffer, p_offset, chunkSize);
                         if (ret != chunkSize) {
                             //->throw new DXRAMRuntimeException("Unknown error, importer size " + ret + " != chunk size " + chunkSize);
@@ -386,12 +385,12 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
             } catch (final MemoryRuntimeException e) {
                 if (p_acquireWriteLock)
-                    m_cidTable.directWriteUnlock(directEntryAddress);
-                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+                    cidTable.directWriteUnlock(directEntryAddress);
+                MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
                 throw e;
             } finally {
                 if (!p_acquireWriteLock)
-                    m_cidTable.directReadUnlock(directEntryAddress);
+                    cidTable.directReadUnlock(directEntryAddress);
             }
         }
 
@@ -399,6 +398,20 @@ public class MemoryAccess {
     }
 
     //PUT---------------------------------------------------------------------------------------------------------------
+
+    /**
+     * Put data of the a data structure/chunk to the memory
+     * This operation is Thread-Safe
+     *
+     * @param p_dataStructure
+     *          Data structure to put
+     * @return
+     *          True if putting the data was successful, false if
+     *          no chunk with the specified id exists
+     */
+    public boolean put(final DataStructure p_dataStructure) {
+        return put(p_dataStructure, true);
+    }
 
     /**
      * Put data of the a data structure/chunk to the memory
@@ -424,20 +437,20 @@ public class MemoryAccess {
 
         if (p_dataStructure.getID() == ChunkID.INVALID_ID) { //Check if CID can be correct
             p_dataStructure.setState(ChunkState.INVALID_ID);
-        } else if ((directEntryAddress = m_cidTable.getAddressOfEntry(p_dataStructure.getID())) == SmallObjectHeap.INVALID_ADDRESS) { //Check if a CID exist
+        } else if ((directEntryAddress = cidTable.getAddressOfEntry(p_dataStructure.getID())) == SmallObjectHeap.INVALID_ADDRESS) { //Check if a CID exist
             p_dataStructure.setState(ChunkState.DOES_NOT_EXIST);
-        } else if (!p_acquireWriteLock || m_cidTable.directWriteLock(directEntryAddress)) { //check if a lock was received
+        } else if (!p_acquireWriteLock || cidTable.directWriteLock(directEntryAddress)) { //check if a lock was received
             try {
                 // #ifdef STATISTICS
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.directGet(directEntryAddress);
+                entry = cidTable.directGet(directEntryAddress);
                 if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                    assert m_rawMemory.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
+                    assert smallObjectHeap.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
 
                     // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter exporter = m_memManager.getImExporter(entry);
+                    SmallObjectHeapDataStructureImExporter exporter = memory.getImExporter(entry);
                     exporter.exportObject(p_dataStructure);
 
                     p_dataStructure.setState(ChunkState.OK);
@@ -452,10 +465,10 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
             } catch (final MemoryRuntimeException e) {
-                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+                MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
                 throw e;
             } finally {
-                m_cidTable.directWriteUnlock(directEntryAddress);
+                cidTable.directWriteUnlock(directEntryAddress);
             }
         }
 
@@ -464,6 +477,22 @@ public class MemoryAccess {
         // #endif /* LOGGER == TRACE */
 
         return ret;
+    }
+
+    /**
+     * Put some data into a chunk.
+     * This operation is Thread-Safe
+     *
+     * @param p_chunkID
+     *          Chunk ID for the data to put
+     * @param p_data
+     *          Chunk data to put
+     * @return
+     *          True if putting the data was successful, false if
+     *          no chunk with the specified id exists
+     */
+    public boolean put(final long p_chunkID, final byte[] p_data) {
+        return put(p_chunkID, p_data, true);
     }
 
     /**
@@ -498,6 +527,28 @@ public class MemoryAccess {
      *          Offset for p_data array
      * @param p_length
      *          Number of bytes to put
+     * @return
+     *          True if putting the data was successful, false if
+     *          no chunk with the specified id exists
+     */
+    boolean put(final long p_chunkID, final byte[] p_data, final int p_offset, final int p_length) {
+        return put(p_chunkID, p_data, p_offset, p_length, true);
+    }
+
+    /**
+     * Put some data into a chunk.
+     * This method use a switchable lock //TODO Reset to normal lock
+     *
+     * This operation is Thread-Safe
+     *
+     * @param p_chunkID
+     *          Chunk ID for the data to put
+     * @param p_data
+     *          Chunk data to put
+     * @param p_offset
+     *          Offset for p_data array
+     * @param p_length
+     *          Number of bytes to put
      * @param p_acquireWriteLock
      *          Do we need a write lock or is a write lock set
      * @return
@@ -514,32 +565,34 @@ public class MemoryAccess {
         LOGGER.trace("ENTER put p_chunkID 0x%X, p_offset %d, p_length %d", p_chunkID, p_offset, p_length);
         // #endif /* LOGGER == TRACE */
 
-        if (p_chunkID != ChunkID.INVALID_ID && //Check if CID can be correct
-                (directEntryAddress = m_cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS && //Check if a CID exist
-                (!p_acquireWriteLock || m_memManager.switchableWriteLock(directEntryAddress))) { //check if a lock was received
 
-            try {
+        if (p_chunkID != ChunkID.INVALID_ID) { //Check if CID can be correct
+            if ((directEntryAddress = cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS) { //Check if a CID exist
+                if (!p_acquireWriteLock || memory.switchableWriteLock(directEntryAddress)) { //check if a lock was received
+                    try {
 
-                // #ifdef STATISTICS
-                //->SOP_PUT.enter();
-                // #endif /* STATISTICS */
+                        // #ifdef STATISTICS
+                        //->SOP_PUT.enter();
+                        // #endif /* STATISTICS */
 
-                entry = m_cidTable.directGet(directEntryAddress);
-                if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                    assert p_offset + p_length <= m_rawMemory.getSizeDataBlock(entry) : "offset: " + p_offset + "\tlength: " + p_length + "\tbs: " + m_rawMemory.getSizeDataBlock(entry);
+                        entry = cidTable.directGet(directEntryAddress);
+                        if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
+                            assert p_offset + p_length <= smallObjectHeap.getSizeDataBlock(entry) : "offset: " + p_offset + "\tlength: " + p_length + "\tbs: " + smallObjectHeap.getSizeDataBlock(entry);
 
-                    m_rawMemory.writeBytes(entry, 0, p_data, p_offset, p_length);
-                    ret = true;
+                            smallObjectHeap.writeBytes(entry, 0, p_data, p_offset, p_length);
+                            ret = true;
+                        }
+
+                        // #ifdef STATISTICS
+                        //->SOP_PUT.leave();
+                        // #endif /* STATISTICS */
+                    } catch (final MemoryRuntimeException e) {
+                        MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
+                        throw e;
+                    } finally {
+                        memory.switchableWriteUnlock(directEntryAddress);
+                    }
                 }
-
-                // #ifdef STATISTICS
-                //->SOP_PUT.leave();
-                // #endif /* STATISTICS */
-            } catch (final MemoryRuntimeException e) {
-                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
-                throw e;
-            } finally {
-                m_memManager.switchableWriteUnlock(directEntryAddress);
             }
         }
 
@@ -575,8 +628,8 @@ public class MemoryAccess {
         // #endif /* LOGGER == TRACE */
 
         if (p_chunkID != ChunkID.INVALID_ID && //Check if CID can be correct
-                (directEntryAddress = m_cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS && //Check if a CID exist
-                m_cidTable.directWriteLock(directEntryAddress)) { //check if a lock was received
+                (directEntryAddress = cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS && //Check if a CID exist
+                cidTable.directWriteLock(directEntryAddress)) { //check if a lock was received
 
             try {
 
@@ -584,12 +637,12 @@ public class MemoryAccess {
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.directGet(directEntryAddress);
+                entry = cidTable.directGet(directEntryAddress);
                 if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                    int fullSize = m_rawMemory.getSizeDataBlock(entry);
+                    int fullSize = smallObjectHeap.getSizeDataBlock(entry);
                     byte[] data = new byte[fullSize];
-                    m_rawMemory.readBytes(entry, 0, data, 0, data.length);
-                    m_rawMemory.writeBytes(entry, 0, byteDataManipulation.getNewData(data), 0, data.length);
+                    smallObjectHeap.readBytes(entry, 0, data, 0, data.length);
+                    smallObjectHeap.writeBytes(entry, 0, byteDataManipulation.getNewData(data), 0, data.length);
                     ret = true;
                 }
 
@@ -597,10 +650,10 @@ public class MemoryAccess {
                 //->SOP_PUT.leave();
                 // #endif /* STATISTICS */
             } catch (final MemoryRuntimeException e) {
-                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+                MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
                 throw e;
             } finally {
-                m_cidTable.directWriteUnlock(directEntryAddress);
+                cidTable.directWriteUnlock(directEntryAddress);
             }
         }
 
@@ -638,25 +691,25 @@ public class MemoryAccess {
 
         if (p_dataStructure.getID() == ChunkID.INVALID_ID) { //Check if CID can be correct
             p_dataStructure.setState(ChunkState.INVALID_ID);
-        } else if ((directEntryAddress = m_cidTable.getAddressOfEntry(p_dataStructure.getID())) == SmallObjectHeap.INVALID_ADDRESS) { //Check if a CID exist
+        } else if ((directEntryAddress = cidTable.getAddressOfEntry(p_dataStructure.getID())) == SmallObjectHeap.INVALID_ADDRESS) { //Check if a CID exist
             p_dataStructure.setState(ChunkState.DOES_NOT_EXIST);
-        } else if (m_cidTable.directWriteLock(directEntryAddress)) { //check if a lock was received
+        } else if (cidTable.directWriteLock(directEntryAddress)) { //check if a lock was received
             try {
                 // #ifdef STATISTICS
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.directGet(directEntryAddress);
+                entry = cidTable.directGet(directEntryAddress);
                 address = ADDRESS.get(entry);
                 deleted = FULL_FLAG.get(entry);
                 if (address > SmallObjectHeap.INVALID_ADDRESS && !deleted) {
-                    assert m_rawMemory.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
+                    assert smallObjectHeap.getSizeDataBlock(entry) == p_dataStructure.sizeofObject();
 
                     // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(entry);
+                    SmallObjectHeapDataStructureImExporter importer = memory.getImExporter(entry);
                     importer.importObject(p_dataStructure);
 
-                    SmallObjectHeapDataStructureImExporter exporter = m_memManager.getImExporter(entry);
+                    SmallObjectHeapDataStructureImExporter exporter = memory.getImExporter(entry);
                     exporter.exportObject(dataStructureManipulation.getNewData(p_dataStructure));
 
                     p_dataStructure.setState(ChunkState.OK);
@@ -671,10 +724,10 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
             } catch (final MemoryRuntimeException e) {
-                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+                MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
                 throw e;
             } finally {
-                m_cidTable.directWriteUnlock(directEntryAddress);
+                cidTable.directWriteUnlock(directEntryAddress);
             }
         }
 
@@ -713,8 +766,8 @@ public class MemoryAccess {
         // #endif /* LOGGER == TRACE */
 
         if (p_chunkID != ChunkID.INVALID_ID && //Check if CID can be correct
-                (directEntryAddress = m_cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS && //Check if a CID exist
-                m_cidTable.directWriteLock(directEntryAddress)) { //check if a lock was received
+                (directEntryAddress = cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS && //Check if a CID exist
+                cidTable.directWriteLock(directEntryAddress)) { //check if a lock was received
 
             try {
 
@@ -722,12 +775,12 @@ public class MemoryAccess {
                 //->SOP_PUT.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.directGet(directEntryAddress);
+                entry = cidTable.directGet(directEntryAddress);
                 if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                    int fullSize = m_rawMemory.getSizeDataBlock(entry);
+                    int fullSize = smallObjectHeap.getSizeDataBlock(entry);
                     byte[] data = new byte[fullSize];
-                    m_rawMemory.readBytes(entry, 0, data, 0, data.length);
-                    m_rawMemory.writeBytes(entry, 0, chunkDataManipulation.getNewData(data, selected), 0, data.length);
+                    smallObjectHeap.readBytes(entry, 0, data, 0, data.length);
+                    smallObjectHeap.writeBytes(entry, 0, chunkDataManipulation.getNewData(data, selected), 0, data.length);
                     ret = true;
                 }
 
@@ -735,10 +788,10 @@ public class MemoryAccess {
                 //->SOP_PUT.leave();
                 // #endif /* STATISTICS */
             } catch (final MemoryRuntimeException e) {
-                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+                MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
                 throw e;
             } finally {
-                m_cidTable.directWriteUnlock(directEntryAddress);
+                cidTable.directWriteUnlock(directEntryAddress);
             }
         }
 
@@ -774,8 +827,8 @@ public class MemoryAccess {
         // #endif /* LOGGER == TRACE */
 
         if (p_chunkID != ChunkID.INVALID_ID && //Check if CID can be correct
-                (directEntryAddress = m_cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS && //Check if a CID exist
-                m_cidTable.directReadLock(directEntryAddress)) { //check if a lock was received
+                (directEntryAddress = cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS && //Check if a CID exist
+                cidTable.directReadLock(directEntryAddress)) { //check if a lock was received
 
             try {
 
@@ -783,13 +836,13 @@ public class MemoryAccess {
                 //->SOP_GET.enter();
                 // #endif /* STATISTICS */
 
-                entry = m_cidTable.directGet(directEntryAddress);
+                entry = cidTable.directGet(directEntryAddress);
                 if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                    int chunkSize = m_rawMemory.getSizeDataBlock(entry);
+                    int chunkSize = smallObjectHeap.getSizeDataBlock(entry);
                     ret = new byte[chunkSize];
 
                     // pool the im/exporters
-                    SmallObjectHeapDataStructureImExporter importer = m_memManager.getImExporter(entry);
+                    SmallObjectHeapDataStructureImExporter importer = memory.getImExporter(entry);
                     int retSize = importer.readBytes(ret);
 
                     if (retSize != chunkSize) {
@@ -811,10 +864,10 @@ public class MemoryAccess {
                 // #endif /* STATISTICS */
 
             } catch (final MemoryRuntimeException e) {
-                MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+                MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
                 throw e;
             } finally {
-                m_cidTable.directReadUnlock(directEntryAddress);
+                cidTable.directReadUnlock(directEntryAddress);
             }
         }
 

@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class MemoryTesting {
     private static final Logger LOGGER = LogManager.getFormatterLogger(MemoryTesting.class.getSimpleName());
 
-    private final MemoryManager m;
+    private final MemoryManager memory;
 
     //Variable for multi threading
     //Prevent Java heap exceptions by too many Runnables
@@ -52,8 +52,8 @@ public final class MemoryTesting {
     /**
      * Create a testing instance
      */
-    public MemoryTesting(final short p_nodeID, final long p_heapSize, final int p_maxBlockSize){
-        m = new MemoryManager(p_nodeID, p_heapSize, p_maxBlockSize);
+    public MemoryTesting(final MemoryManager memoryManager){
+        memory = memoryManager;
     }
 
     /**
@@ -62,15 +62,15 @@ public final class MemoryTesting {
      * @return the current used MemoryManager
      */
     public final MemoryManager getMemoryManager() {
-        return m;
+        return memory;
     }
 
     /**
      * delete all chunks
      */
     public final void resetHeap(){
-        for (int i = 0; i <= m.memoryInformation.getHighestUsedLocalID(); i++) {
-            m.remove(i, false);
+        for (int i = 0; i <= memory.info.getHighestUsedLocalID(); i++) {
+            memory.management.remove(i, false);
         }
     }
 
@@ -78,7 +78,7 @@ public final class MemoryTesting {
      * Destroy the testing instance
      */
     public final void destroy(){
-        m.shutdownMemory();
+        memory.shutdownMemory();
     }
 
     /**
@@ -151,11 +151,11 @@ public final class MemoryTesting {
         nChunks = p_nChunks;
 
         counter = new AtomicLong[nChunks];
-        cids = m.createMulti(p_chunkSize, p_nChunks);
+        cids = memory.management.createMulti(p_chunkSize, p_nChunks);
         ref = new long[nChunks];
 
         for (int i = 0; i < nChunks; i++) {
-            m.put(cids[i], FastByteUtils.longToBytes(0));
+            memory.access.put(cids[i], FastByteUtils.longToBytes(0));
 
             ref[i] = 0;
             counter[i] = new AtomicLong(0);
@@ -169,7 +169,7 @@ public final class MemoryTesting {
     public final void reInitHeap(){
         //reset values
         for (int i = 0; i < nChunks; i++) {
-            m.put(cids[i], FastByteUtils.longToBytes(0));
+            memory.access.put(cids[i], FastByteUtils.longToBytes(0));
             ref[i] = 0;
             counter[i].set(0);
         }
@@ -187,7 +187,7 @@ public final class MemoryTesting {
         System.arraycopy(cids, 0, newCIDS, 0, cids.length);
 
         for (int i = cids.length; i < newCIDS.length; i++) {
-            newCIDS[i] = m.create(chunkSize);
+            newCIDS[i] = memory.management.create(chunkSize);
         }
 
         cids = newCIDS;
@@ -197,7 +197,7 @@ public final class MemoryTesting {
         counter = new AtomicLong[nChunks];
 
         for (int i = 0; i < nChunks; i++) {
-            m.put(cids[i], FastByteUtils.longToBytes(0));
+            memory.access.put(cids[i], FastByteUtils.longToBytes(0));
             ref[i] = 0;
             counter[i] = new AtomicLong(0);
         }
@@ -212,9 +212,8 @@ public final class MemoryTesting {
      * @param nOperations Operation count
      * @param nThreads Active threads at the same time
      * @param writeProbability Probability of a write access
-     * @throws InterruptedException Termination can throw this exception
      */
-    public final void lockTestFunctionality(final long nOperations, final int nThreads, final double writeProbability) throws InterruptedException {
+    public final void lockTestFunctionality(final long nOperations, final int nThreads, final double writeProbability) {
         assert nChunks > 0: "Run initHeap(final int p_chunkSize, final int p_nChunks) first";
         ChunkDataManipulationTesting increment = (oldData, selected) -> {
             if(ref[selected] != FastByteUtils.bytesToLong(oldData)){
@@ -234,29 +233,33 @@ public final class MemoryTesting {
 
             if(Math.random() <= writeProbability){
                 //write access
-                byte[] data = m.get(cids[selectedChunk], true);
+                byte[] data = memory.access.get(cids[selectedChunk], true);
                 ref[selectedChunk]++;
                 counter[selectedChunk].incrementAndGet();
                 data = FastByteUtils.longToBytes(FastByteUtils.bytesToLong(data)+1);
-                m.put(cids[selectedChunk], data, false);
+                memory.access.put(cids[selectedChunk], data, false);
             } else{
                 //read access
-                long tmp = FastByteUtils.bytesToLong(m.memoryAccess.getTesting(cids[selectedChunk], ref, selectedChunk));
+                long tmp = FastByteUtils.bytesToLong(memory.access.getTesting(cids[selectedChunk], ref, selectedChunk));
             }
         };
 
         //Perform n operations with the Runnable
         Stopwatch stopwatch = new Stopwatch();
         stopwatch.start();
-        execNOperationsRunnables(nThreads, nThreads, nOperations, r);
+        try {
+            execNOperationsRunnables(nThreads, nThreads, nOperations, r);
+        } catch (InterruptedException ignored) {
+
+        }
         stopwatch.stop();
 
         TestingMeasurements.add(nThreads, stopwatch.toString());
 
         //check if the counter equals the storage value
         for (int i = 0; i < nChunks; i++) {
-            if (counter[i].get() != FastByteUtils.bytesToLong(m.get(cids[i]))) {
-                LOGGER.error("expected: " + counter[i].get() + " get: " + FastByteUtils.bytesToLong(m.get(cids[i])));
+            if (counter[i].get() != FastByteUtils.bytesToLong(memory.access.get(cids[i]))) {
+                LOGGER.error("expected: " + counter[i].get() + " get: " + FastByteUtils.bytesToLong(memory.access.get(cids[i])));
                 System.exit(1);
             }
         }
@@ -285,9 +288,9 @@ public final class MemoryTesting {
 
             if(Math.random() <= writeProbability){
                 //write access
-                m.modify(cids[selectedChunk], increment);
+                memory.access.modify(cids[selectedChunk], increment);
             } else{
-                byte[] test = m.get(cids[selectedChunk]);
+                byte[] test = memory.access.get(cids[selectedChunk]);
                 long tmp = FastByteUtils.bytesToLong(test);
             }
         };
@@ -316,8 +319,8 @@ public final class MemoryTesting {
         Runnable r = () -> {
             //get random String
             String str = strings[(int)getRandom(0, strings.length - 1)];
-            long cid = m.create(str.length());
-             m.put(cid, str.getBytes());
+            long cid = memory.management.create(str.length());
+             memory.access.put(cid, str.getBytes());
         };
 
         Stopwatch stopwatch = new Stopwatch();
@@ -329,8 +332,8 @@ public final class MemoryTesting {
         if(testData){
             //In a lambda Runnable we can only work with final variables.
             //Therefore, i becomes a quasi-final variable by using an array.
-            for (int[] i = {0}; i[0] <= m.memoryInformation.getHighestUsedLocalID(); i[0]++) {
-                byte[] data = m.get(i[0]);
+            for (int[] i = {0}; i[0] <= memory.info.getHighestUsedLocalID(); i[0]++) {
+                byte[] data = memory.access.get(i[0]);
                 if(data != null){
                     if (Arrays.stream(strings).noneMatch(x -> x.matches(new String(data)))) {
                         LOGGER.error("Error >>" + new String(data));
@@ -339,7 +342,7 @@ public final class MemoryTesting {
                 }
 
                 if(delete)
-                    m.remove(i[0], false);
+                    memory.management.remove(i[0], false);
 
                 delete = !delete;
 
@@ -361,27 +364,26 @@ public final class MemoryTesting {
             data[i] = (byte) i;
         }
 
-        long[] cids = m.createMulti(blockSize,nChunks);
+        long[] cids = memory.management.createMulti(blockSize,nChunks);
         long[] entry = new long[nChunks];
 
         for (int i = 0; i < nChunks; i++) {
-            entry[i] = m.pinChunk(cids[i]); //Pinning ok?
+            entry[i] = memory.pinning.pinChunk(cids[i]); //Pinning ok?
+            memory.management.remove(cids[i], false); //Flag ok?
 
-            m.remove(cids[i], false); //Flag ok?
-
-            m.putPinned(entry[i], data); //put ok?
-            byte[] testRead = m.getPinned(entry[i]); //get ok?
+            memory.pinning.put(entry[i], data); //access.put ok?
+            byte[] testRead = memory.pinning.get(entry[i]); //get ok?
             for (int j = 0; j < data.length; j++) { //check if really ok?
                 if(data[j] != testRead[j]) {
                     System.exit(-1);
                 }
             }
 
-            if(cids[i] != m.unpinChunk(entry[i])){ //do unpin
+            if(cids[i] != memory.pinning.unpinChunk(entry[i])){ //do unpin
                 System.out.println("DFS error CID: " + cids[i]);
                 System.exit(-1);
             }
-            m.remove(cids[i], true); //flag ok?
+            memory.management.remove(cids[i], true); //flag ok?
         }
     }
 
@@ -433,25 +435,25 @@ public final class MemoryTesting {
             runs.incrementAndGet();
             wait(minDelayInMS, maxDelay);
 
-            long cid = getRandom(1, m.memoryInformation.getHighestUsedLocalID());
+            long cid = getRandom(1, memory.info.getHighestUsedLocalID());
             if(Math.random() < changeProbability){
                 if(Math.random() < readProbability){
                     //read data
-                    if(m.get(cid) != null)
+                    if(memory.access.get(cid) != null)
                         read.incrementAndGet();
 
                 } else {
                     //change data
-                    if(m.modify(cid, increment))
+                    if(memory.access.modify(cid, increment))
                         write.incrementAndGet();
                 }
             } else {
                 if(Math.random() < createProbability){
                     //create
-                    m.create((int)getRandom(minSize, maxSizeInByte));
+                    memory.management.create((int)getRandom(minSize, maxSizeInByte));
                     create.incrementAndGet();
                 } else{
-                    if(m.remove(cid, false) != -1){
+                    if(memory.management.remove(cid, false) != -1){
                         delete.incrementAndGet();
                     }
                 }
@@ -462,8 +464,8 @@ public final class MemoryTesting {
         byte[] data = FastByteUtils.longToBytes(0);
         long cid;
         for (int i = 0; i < initialChunks; i++) {
-            cid = m.create((int)getRandom(initMinSize, initMaxSize));
-            m.put(cid, data);
+            cid = memory.management.create((int)getRandom(initMinSize, initMaxSize));
+            memory.access.put(cid, data);
         }
 
         Stopwatch stopwatch = new Stopwatch();
@@ -489,7 +491,7 @@ public final class MemoryTesting {
      * @param maxSize
      *          Maximal size of a chunk
      */
-    public final void createDeleteTest(final long nOperations, final int nThreads, final double createProbability, final int minSize, final int maxSize) throws InterruptedException {
+    public final void createDeleteTest(final long nOperations, final int nThreads, final double createProbability, final int minSize, final int maxSize) {
         AtomicLong readCount = new AtomicLong(0);
         AtomicLong writeCount = new AtomicLong(0);
         //Create a Runnable
@@ -498,12 +500,12 @@ public final class MemoryTesting {
 
             if(Math.random() < createProbability){
                 int size = (int)getRandom(minSize, maxSize);
-                m.create(size);
+                memory.management.create(size);
                 readCount.incrementAndGet();
 
             } else{
-                long remove = getRandom(1, m.memoryInformation.getHighestUsedLocalID());
-                if(m.remove(remove, false) != -1){
+                long remove = getRandom(1, memory.info.getHighestUsedLocalID());
+                if(memory.management.remove(remove, false) != -1){
                     writeCount.incrementAndGet();
                 }
             }
@@ -512,7 +514,9 @@ public final class MemoryTesting {
 
         Stopwatch stopwatch = new Stopwatch();
         stopwatch.start();
-        execNOperationsRunnables(nThreads, nThreads, nOperations, r);
+        try {
+            execNOperationsRunnables(nThreads, nThreads, nOperations, r);
+        } catch (InterruptedException ignored) {}
         stopwatch.stop();
 
         TestingMeasurements.add(nThreads, stopwatch.toString());

@@ -24,9 +24,9 @@ import java.util.concurrent.atomic.AtomicLong;
 @SuppressWarnings("unused")
 public class Evaluation {
     private static final Logger LOGGER = LogManager.getFormatterLogger(Evaluation.class.getSimpleName());
-    private static final DateFormat df = new SimpleDateFormat("yyyy-MM-dd_-_HH-mm");
+    private static final DateFormat df = new SimpleDateFormat("yyyy-MM-dd_-_HH-mm-ss");
 
-    private final MemoryManager memoryManager;
+    private final MemoryManager memory;
     private final String resultFolder;
 
     private final String fileNameExtension;
@@ -55,8 +55,8 @@ public class Evaluation {
      */
     public Evaluation(final MemoryManager p_memoryManager, final String p_resultPath,
                       final boolean readLock, final boolean writeLock) {
-        memoryManager = p_memoryManager;
-        memoryManager.setLocks(readLock, writeLock);
+        memory = p_memoryManager;
+        memory.setLocks(readLock, writeLock);
 
         fileNameExtension = String.format("locks: read_%s_-_write_%s", (readLock) ? "r":"w", (writeLock) ? "w":"r" );
 
@@ -140,7 +140,7 @@ public class Evaluation {
         Runnable r = () -> {
             wait(minDelay, maxDelay);
 
-            long randomCID = getRandom(1, memoryManager.memoryInformation.getHighestUsedLocalID());
+            long randomCID = getRandom(1, memory.info.getHighestUsedLocalID());
             double selector = Math.random();
             long start;
             boolean ok;
@@ -148,35 +148,35 @@ public class Evaluation {
             if(selector < createProbability) {
                 //create
                 start = SimpleStopwatch.startTime();
-                ok = memoryManager.create((int)getRandom(minSize, maxSize)) != ChunkID.INVALID_ID;
+                ok = memory.management.create((int)getRandom(minSize, maxSize)) != ChunkID.INVALID_ID;
                 create.addTime(ok, SimpleStopwatch.stopAndGetDelta(start));
 
             } else if(createProbability <= selector && selector < removeLimit) {
                 start = SimpleStopwatch.startTime();
-                ok = memoryManager.remove(randomCID, false) != ChunkID.INVALID_ID;
+                ok = memory.management.remove(randomCID, false) != ChunkID.INVALID_ID;
                 remove.addTime(ok, SimpleStopwatch.stopAndGetDelta(start));
             } else if(removeLimit <= selector && selector < writeLimit) {
                 start = SimpleStopwatch.startTime();
-                ok = memoryManager.put(randomCID, FastByteUtils.longToBytes(putCounter.getAndIncrement()));
+                ok = memory.access.put(randomCID, FastByteUtils.longToBytes(putCounter.getAndIncrement()),true);
                 write.addTime(ok, SimpleStopwatch.stopAndGetDelta(start));
             } else {
                 //read data
                 start = SimpleStopwatch.startTime();
-                ok = memoryManager.memoryAccess.get(randomCID) != null;
+                ok = memory.access.get(randomCID) != null;
                 read.addTime(ok, SimpleStopwatch.stopAndGetDelta(start));
             }
         };
 
         for (int i = 0; i < rounds; i++) {
             //cleanup old chunks
-            for (int j = 0; j < memoryManager.memoryInformation.numActiveChunks; j++) {
-                memoryManager.remove(j, false);
+            for (int j = 0; j < memory.info.numActiveChunks; j++) {
+                memory.management.remove(j, false);
             }
 
             //Create initial chunks
             for (int j = 0; j < initialChunks; j++) {
-                cid = memoryManager.create((int) getRandom(initMinSize, initMaxSize));
-                memoryManager.put(cid, data);
+                cid = memory.management.create((int) getRandom(initMinSize, initMaxSize));
+                memory.access.put(cid, data);
             }
 
             long start = SimpleStopwatch.startTime();
@@ -192,6 +192,7 @@ public class Evaluation {
             } catch (IOException ignored) {
 
             }
+            memory.analyzer.analyze(true);
             measurementHelper.newRound();
         }
     }
