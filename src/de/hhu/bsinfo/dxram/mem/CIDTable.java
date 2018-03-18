@@ -259,7 +259,7 @@ final class CIDTable {
      * @return The entry. 0 for invalid/unused.
      */
     long get(final long p_chunkID) {
-        return get(getAddressOfEntry(p_chunkID));
+        return directGet(getAddressOfEntry(p_chunkID));
     }
 
     /**
@@ -545,7 +545,7 @@ final class CIDTable {
                 continue;
             }
 
-            if (m_rawMemory.compareAndSwapLong(p_directEntryAddress, 0, value, value + READ_INCREMENT))
+            if (m_rawMemory.compareAndSwapLong(p_directEntryAddress, value, value + READ_INCREMENT))
                 break;
 
             Thread.yield();
@@ -588,7 +588,7 @@ final class CIDTable {
             if((value & READ_ACCESS.BITMASK) == 0)
                 return false;
 
-            if(m_rawMemory.compareAndSwapLong(p_directEntryAddress, 0, value, value - READ_INCREMENT))
+            if(m_rawMemory.compareAndSwapLong(p_directEntryAddress, value, value - READ_INCREMENT))
                 break;
 
             Thread.yield();
@@ -631,9 +631,8 @@ final class CIDTable {
                 continue;
             }
 
-            if(m_rawMemory.compareAndSwapLong(p_directEntryAddress, 0, value, value | WRITE_ACCESS.BITMASK))
+            if(m_rawMemory.compareAndSwapLong(p_directEntryAddress, value, value | WRITE_ACCESS.BITMASK))
                 break;
-
         }
 
         // wait until no present read access
@@ -678,7 +677,7 @@ final class CIDTable {
             if((value & WRITE_ACCESS.BITMASK) == 0)
                 return false;
 
-            if(m_rawMemory.compareAndSwapLong(p_directEntryAddress, 0, value, value & ~WRITE_ACCESS.BITMASK))
+            if(m_rawMemory.compareAndSwapLong(p_directEntryAddress, value, value & ~WRITE_ACCESS.BITMASK))
                 break;
         }
 
@@ -843,7 +842,7 @@ final class CIDTable {
             if(entry == FREE_ENTRY && entry == ZOMBIE_ENTRY)
                 return false;
 
-            if(m_rawMemory.compareAndSwapLong(p_directEntryAddress, 0, entry, p_state.set(entry, p_newState)))
+            if(m_rawMemory.compareAndSwapLong(p_directEntryAddress, entry, p_state.set(entry, p_newState)))
                 break;
         }
 

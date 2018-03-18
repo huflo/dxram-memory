@@ -1830,6 +1830,23 @@ public final class SmallObjectHeap implements Importable, Exportable {
         return m_memory.compareAndSwapLong(p_address + lfs + p_offset, p_expectedData, p_newData);
     }
 
+    /**
+     * Do a compare and swap operation on a long value.
+     * This method works with the direct address of a long variable.
+     *
+     * @param p_directAddress
+     *          address of the long
+     * @param p_expectedData
+     *          the data which is expected
+     * @param p_newData
+     *          the new long data
+     * @return
+     *          is the data replaced?
+     */
+    boolean compareAndSwapLong(final long p_directAddress, final long p_expectedData, final long p_newData){
+        return m_memory.compareAndSwapLong(p_directAddress, p_expectedData, p_newData);
+    }
+
     // --------------------------------------------------------------------------------------
 
     // Classes

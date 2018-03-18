@@ -113,9 +113,9 @@ public class MemoryManager {
      */
     boolean switchableReadLock(final long p_directEntryAddress){
         if(m_readLock)
-            return cidTable.readLock(p_directEntryAddress);
+            return cidTable.directReadLock(p_directEntryAddress);
         else
-            return cidTable.writeLock(p_directEntryAddress);
+            return cidTable.directWriteLock(p_directEntryAddress);
     }
 
     /**
@@ -131,9 +131,9 @@ public class MemoryManager {
      */
     boolean switchableReadUnlock(final long p_directEntryAddress){
         if(m_readLock)
-            return cidTable.readUnlock(p_directEntryAddress);
+            return cidTable.directReadUnlock(p_directEntryAddress);
         else
-            return cidTable.writeUnlock(p_directEntryAddress);
+            return cidTable.directWriteUnlock(p_directEntryAddress);
     }
 
     /**
@@ -149,9 +149,9 @@ public class MemoryManager {
      */
     boolean switchableWriteLock(final long p_directEntryAddress){
         if(m_writeLock)
-            return cidTable.writeLock(p_directEntryAddress);
+            return cidTable.directWriteLock(p_directEntryAddress);
         else
-            return cidTable.readLock(p_directEntryAddress);
+            return cidTable.directReadLock(p_directEntryAddress);
     }
 
     /**
@@ -167,9 +167,9 @@ public class MemoryManager {
      */
     boolean switchableWriteUnlock(final long p_directEntryAddress){
         if(m_writeLock)
-            return cidTable.writeUnlock(p_directEntryAddress);
+            return cidTable.directWriteUnlock(p_directEntryAddress);
         else
-            return cidTable.readUnlock(p_directEntryAddress);
+            return cidTable.directReadUnlock(p_directEntryAddress);
     }
 
 
