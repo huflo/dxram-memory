@@ -19,22 +19,22 @@ import static de.hhu.bsinfo.dxram.mem.SmallObjectHeap.*;
  * @projectname dxram-memory
  */
 @SuppressWarnings({"SameParameterValue", "FieldCanBeLocal"})
-final public class MemoryManagerAnalyzer {
-    private static final Logger LOGGER = LogManager.getFormatterLogger(MemoryManagerAnalyzer.class.getSimpleName());
+final public class MemoryAnalyzer {
+    private static final Logger LOGGER = LogManager.getFormatterLogger(MemoryAnalyzer.class.getSimpleName());
 
-    private final SmallObjectHeap m_heap;
-    private final CIDTable m_table;
-    private final MemoryManager.MemoryInformation m_info;
-    private final boolean m_quiet;
-    private final boolean m_dumpOnError;
+    private final SmallObjectHeap smallObjectHeap;
+    private final CIDTable cidTable;
+    private final MemoryManager.MemoryInformation info;
+    private boolean m_quiet;
+    private boolean m_dumpOnError;
 
-    private final LinkedList<Long> m_freeBlocks;
+    private LinkedList<Long> m_freeBlocks;
     private long nextFree;
 
-    private final LinkedList<Long> m_dataBlocks;
+    private LinkedList<Long> m_dataBlocks;
     private long nextData;
 
-    private final LinkedList<Long> m_managementTables;
+    private LinkedList<Long> m_managementTables;
     private long nextTable;
 
     private long predictedAddress = SIZE_MARKER_BYTE;
@@ -45,46 +45,41 @@ final public class MemoryManagerAnalyzer {
      * Constructor
      *
      * @param memoryManager The central unit which manages all memory accesses
-     * @param p_quiet Be quiet. If true print only the first occurring error
-     * @param p_dumpOnError Create a heap dump on a Error
      */
-    MemoryManagerAnalyzer(final MemoryManager memoryManager,
-                          final boolean p_quiet, final boolean p_dumpOnError){
-        m_table = memoryManager.cidTable;
-        m_heap = memoryManager.smallObjectHeap;
-        m_info = memoryManager.memoryInformation;
-
-        m_quiet = p_quiet;
-        m_dumpOnError = p_dumpOnError;
-        LOGGER.info(String.format("Init with: be quiet(print only errors): %b, do dump on error: %b", m_quiet, m_dumpOnError));
-
-        //free blocks are managed with lists. They fully describe them self
-        m_freeBlocks = getAllFreeBlocks();
-        Collections.sort(m_freeBlocks);
-
-        //dataBlock have a divided length field in cid 10 bits and 0-32 bits in the data block
-        m_dataBlocks = getAllDataBlocks();
-        m_dataBlocks.sort(Comparator.comparingLong(CIDTableEntry.ADDRESS::get));
-
-        //tables have no length fields because the size is fixed
-        m_managementTables = getAllManagementTables();
-        m_managementTables.sort(Comparator.comparingLong(CIDTableEntry.ADDRESS::get));
-
-        LOGGER.info(String.format("Collected data. Found: managed free blocks: %d, data blocks: %d, table: %d",
-                m_freeBlocks.size(), m_dataBlocks.size(), m_managementTables.size()));
+    MemoryAnalyzer(final MemoryManager memoryManager){
+        cidTable = memoryManager.cidTable;
+        smallObjectHeap = memoryManager.smallObjectHeap;
+        info = memoryManager.info;
 
     }
-
 
     /**
      * Analyze the memory structure
      *
+     * @param p_quiet Be quiet. If true print only the first occurring error
      * @return True if no error occurred, false else
      */
-    final public boolean analyze(){
-        assert  m_table.getNextLocalIDCounter()-1 < Integer.MAX_VALUE;
+    final public boolean analyze(final boolean p_quiet) {
+        return analyze(p_quiet, false);
+    }
+
+    /**
+     * Analyze the memory structure
+     *
+     * @param p_quiet Be quiet. If true print only the first occurring error
+     * @param p_dumpOnError Create a heap dump on a Error
+     * @return True if no error occurred, false else
+     */
+    final public boolean analyze(final boolean p_quiet, final boolean p_dumpOnError){
+        assert  cidTable.getNextLocalIDCounter()-1 < Integer.MAX_VALUE;
+        m_quiet = p_quiet;
+        m_dumpOnError = p_dumpOnError;
 
         long address;
+
+        //collect data
+        collectData();
+
 
         //Get free blocks from the free block lists and sort them
         nextFree = getNext(m_freeBlocks);
@@ -98,7 +93,7 @@ final public class MemoryManagerAnalyzer {
         while (nextFree < Long.MAX_VALUE || nextData < Long.MAX_VALUE || nextTable < Long.MAX_VALUE) {
 
             //read the marker
-            int marker = m_heap.readRightPartOfMarker(predictedAddress - SIZE_MARKER_BYTE);
+            int marker = smallObjectHeap.readRightPartOfMarker(predictedAddress - SIZE_MARKER_BYTE);
 
             switch (marker) {
                 case 0:
@@ -156,12 +151,12 @@ final public class MemoryManagerAnalyzer {
 
             }
 
-            if (ERROR || predictedAddress == m_heap.m_baseFreeBlockList) {
+            if (ERROR || predictedAddress == smallObjectHeap.m_baseFreeBlockList) {
                 break;
             }
         }
 
-        if(m_dumpOnError && ERROR)
+        if(p_dumpOnError && ERROR)
             dump("./heap.dump");
 
         if (!ERROR)
@@ -169,6 +164,28 @@ final public class MemoryManagerAnalyzer {
 
         return !ERROR;
 
+    }
+
+    /**
+     * Collect all Heap data
+     */
+    private void collectData() {
+        LOGGER.info(String.format("Init with: be quiet(print only errors): %b, do dump on error: %b", m_quiet, m_dumpOnError));
+
+        //free blocks are managed with lists. They fully describe them self
+        m_freeBlocks = getAllFreeBlocks();
+        Collections.sort(m_freeBlocks);
+
+        //dataBlock have a divided length field in cid 10 bits and 0-32 bits in the data block
+        m_dataBlocks = getAllDataBlocks();
+        m_dataBlocks.sort(Comparator.comparingLong(CIDTableEntry.ADDRESS::get));
+
+        //tables have no length fields because the size is fixed
+        m_managementTables = getAllManagementTables();
+        m_managementTables.sort(Comparator.comparingLong(CIDTableEntry.ADDRESS::get));
+
+        LOGGER.info(String.format("Collected data. Found: managed free blocks: %d, data blocks: %d, table: %d",
+                m_freeBlocks.size(), m_dataBlocks.size(), m_managementTables.size()));
     }
 
 
@@ -186,16 +203,16 @@ final public class MemoryManagerAnalyzer {
         long tmp_address;
 
         //iterate over all free block lists
-        for (long i = m_heap.m_baseFreeBlockList; i < m_heap.getStatus().getSize(); i+=POINTER_SIZE) {
-            tmp_address = m_heap.read(i, POINTER_SIZE);
+        for (long i = smallObjectHeap.m_baseFreeBlockList; i < smallObjectHeap.getStatus().getSize(); i+=POINTER_SIZE) {
+            tmp_address = smallObjectHeap.read(i, POINTER_SIZE);
 
             //iterate over all entries in the current list
             while (tmp_address != INVALID_ADDRESS){
                 list.add(tmp_address);
 
                 //next element from list
-                lfs = getSizeFromMarker(m_heap.readRightPartOfMarker(tmp_address-SIZE_MARKER_BYTE));
-                tmp_address = m_heap.read(tmp_address + lfs + POINTER_SIZE, POINTER_SIZE);
+                lfs = getSizeFromMarker(smallObjectHeap.readRightPartOfMarker(tmp_address-SIZE_MARKER_BYTE));
+                tmp_address = smallObjectHeap.read(tmp_address + lfs + POINTER_SIZE, POINTER_SIZE);
             }
         }
 
@@ -214,8 +231,8 @@ final public class MemoryManagerAnalyzer {
         long entry;
 
         //iterate over all possible chunk ids
-        while (found < m_info.numActiveChunks){
-            entry = m_table.get(counter++);
+        while (found < info.numActiveChunks){
+            entry = cidTable.get(counter++);
 
             if ( entry == FREE_ENTRY || entry == ZOMBIE_ENTRY ){
                 continue;
@@ -234,7 +251,7 @@ final public class MemoryManagerAnalyzer {
      */
     private LinkedList<Long> getAllManagementTables(){
         LinkedList<Long> tables = new LinkedList<>();
-        tables.add(m_table.getAddressTableDirectory());
+        tables.add(cidTable.getAddressTableDirectory());
 
         int level = LID_TABLE_LEVELS;
         int counter = 0;
@@ -255,7 +272,7 @@ final public class MemoryManagerAnalyzer {
 
                 //iterate over all table entries
                 for (int i = 0; i < tableEntries; i++) {
-                    entry = m_table.readEntry(curTable, i, tableSize);
+                    entry = cidTable.readEntry(curTable, i, tableSize);
                     if( entry == 0 || entry == ZOMBIE_ENTRY) {
                         continue;
                     }
@@ -303,23 +320,23 @@ final public class MemoryManagerAnalyzer {
 
         long address = ADDRESS.get(cidEntry) - lfs;
 
-        out.append(createLog(INVALID_ADDRESS < address && address < m_heap.m_baseFreeBlockList-SIZE_MARKER_BYTE,
+        out.append(createLog(INVALID_ADDRESS < address && address < smallObjectHeap.m_baseFreeBlockList-SIZE_MARKER_BYTE,
                 String.format("address: 0x%012X, ", address)));
 
-        int marker = m_heap.readRightPartOfMarker(address-SIZE_MARKER_BYTE);
+        int marker = smallObjectHeap.readRightPartOfMarker(address-SIZE_MARKER_BYTE);
         out.append(createLog(ALLOC_BLOCK_FLAGS_OFFSET <= marker && marker <= 0x7, String.format("marker: %d, ", marker)));
 
         int lfsFromMarker = getSizeFromMarker(marker);
         out.append(createLog(0 <= lfsFromMarker && lfsFromMarker <= 4, String.format("lfs: %d, ", lfs)));
         out.append(createLog(lfs == lfsFromMarker, String.format("lfs: [m: %d, cid: %d], ", lfsFromMarker, lfs)));
 
-        long lf = m_heap.read(address, lfs);
+        long lf = smallObjectHeap.read(address, lfs);
         out.append(createLog(0 <= lf && lf < (long)Math.pow(2,32), String.format("internal lf: %d", lf )));
 
-        long fullLF = m_heap.getSizeDataBlock(cidEntry);
+        long fullLF = smallObjectHeap.getSizeDataBlock(cidEntry);
         out.append(createLog(1 <= fullLF && fullLF <= (long)Math.pow(2,42), String.format("], combined lf: %d", fullLF )));
 
-        if(marker != m_heap.readLeftPartOfMarker(address + lfs + fullLF)){
+        if(marker != smallObjectHeap.readLeftPartOfMarker(address + lfs + fullLF)){
             ERROR = true;
             out.append("\033[0;31mERROR->\033[0m").append(">>marker differ<<");
         }
@@ -343,10 +360,10 @@ final public class MemoryManagerAnalyzer {
     private void checkFreeBlock(final long p_address, final boolean p_managed){
         StringBuilder out = new StringBuilder("\033[0;34m[FREE]\033[0m\t");
 
-        out.append(createLog(INVALID_ADDRESS < p_address && p_address < m_heap.m_baseFreeBlockList-SIZE_MARKER_BYTE,
+        out.append(createLog(INVALID_ADDRESS < p_address && p_address < smallObjectHeap.m_baseFreeBlockList-SIZE_MARKER_BYTE,
                 String.format("address: 0x%X, ", p_address)));
 
-        int marker = m_heap.readRightPartOfMarker(p_address -SIZE_MARKER_BYTE);
+        int marker = smallObjectHeap.readRightPartOfMarker(p_address -SIZE_MARKER_BYTE);
         out.append(createLog(0 <= marker && marker < ALLOC_BLOCK_FLAGS_OFFSET || marker == SINGLE_BYTE_MARKER,
                 String.format("marker: %d, ", marker)));
 
@@ -356,30 +373,30 @@ final public class MemoryManagerAnalyzer {
 
         long lf = 0;
         if(marker != SINGLE_BYTE_MARKER) {
-            lf = m_heap.read(p_address, lfs);
-            out.append(createLog(lf <= m_heap.getStatus().getFree() || lf == 0, String.format("length field: %d, ", lf)));
+            lf = smallObjectHeap.read(p_address, lfs);
+            out.append(createLog(lf <= smallObjectHeap.getStatus().getFree() || lf == 0, String.format("length field: %d, ", lf)));
 
-            if (lf != m_heap.read(p_address + lf - lfs, lfs)) {
+            if (lf != smallObjectHeap.read(p_address + lf - lfs, lfs)) {
                 ERROR = true;
                 out.append(String.format("\033[0;31m[ERROR]>>length field differ [l: %d, r: %d] <<\033[0m, ",
-                        lf, m_heap.read(p_address + lf - lfs, lfs)));
+                        lf, smallObjectHeap.read(p_address + lf - lfs, lfs)));
             }
         }
 
-        if (marker != m_heap.readLeftPartOfMarker(p_address + lf)){
+        if (marker != smallObjectHeap.readLeftPartOfMarker(p_address + lf)){
             ERROR = true;
             out.append(String.format("\033[0;31m[ERROR]>>marker differ [l: %d, r: %d]<<\033[0m, ",
-                    marker, m_heap.readLeftPartOfMarker(p_address +lf)));
+                    marker, smallObjectHeap.readLeftPartOfMarker(p_address +lf)));
         }
 
         if(p_managed) {
-            long pre = m_heap.readPointer(p_address + lfs);
-            out.append(createLog(INVALID_ADDRESS < pre && pre < m_heap.m_baseFreeBlockList - SIZE_MARKER_BYTE ||
-                    (pre - m_heap.m_baseFreeBlockList) % POINTER_SIZE == 0, String.format("pre: 0x%012X, ", pre)));
+            long pre = smallObjectHeap.readPointer(p_address + lfs);
+            out.append(createLog(INVALID_ADDRESS < pre && pre < smallObjectHeap.m_baseFreeBlockList - SIZE_MARKER_BYTE ||
+                    (pre - smallObjectHeap.m_baseFreeBlockList) % POINTER_SIZE == 0, String.format("pre: 0x%012X, ", pre)));
 
-            long next = m_heap.readPointer(p_address + lfs + POINTER_SIZE);
+            long next = smallObjectHeap.readPointer(p_address + lfs + POINTER_SIZE);
             out.append(createLog(INVALID_ADDRESS <= next &&
-                    p_address < m_heap.m_baseFreeBlockList - SIZE_MARKER_BYTE,
+                    p_address < smallObjectHeap.m_baseFreeBlockList - SIZE_MARKER_BYTE,
                     String.format("next: 0x%012X, ", next)));
         } else {
             out.append("not managed free block");
@@ -396,7 +413,7 @@ final public class MemoryManagerAnalyzer {
     }
 
     /**
-     * Get information about a table of the CIDTables
+     * Get info about a table of the CIDTables
      *
      * @param p_tableAddress Address of the Table
      */
@@ -409,7 +426,7 @@ final public class MemoryManagerAnalyzer {
         int fullEntries = 0;
         int zombieEntries = 0;
 
-        if(p_tableAddress == m_table.getAddressTableDirectory()){
+        if(p_tableAddress == cidTable.getAddressTableDirectory()){
             out.append("\033[0;35m[NID]\033[0m\t");
             numberEntries = ENTRIES_FOR_NID_LEVEL;
             sizeTable = NID_TABLE_SIZE;
@@ -423,7 +440,7 @@ final public class MemoryManagerAnalyzer {
 
         int countActive = 0;
         for (int i = 0; i < numberEntries; i++) {
-            entry = m_table.readEntry(p_tableAddress, i, sizeTable);
+            entry = cidTable.readEntry(p_tableAddress, i, sizeTable);
 
             if(entry == 0) freeEntries++;
             else if(entry == ZOMBIE_ENTRY) zombieEntries++;
@@ -431,7 +448,7 @@ final public class MemoryManagerAnalyzer {
             else countActive++;
         }
 
-        if(p_tableAddress == m_table.getAddressTableDirectory()){
+        if(p_tableAddress == cidTable.getAddressTableDirectory()){
             out.append(String.format("active slots: %d, free slots: %d", countActive, freeEntries));
 
         } else {
@@ -459,7 +476,7 @@ final public class MemoryManagerAnalyzer {
         System.out.println("Data Blocks: [next: " + nextData + "], " + Arrays.toString(m_dataBlocks.toArray()));
         System.out.println("Tables: [next: " + nextFree + "], " + Arrays.toString(m_managementTables.toArray()));
 
-        m_heap.dump(path);
+        smallObjectHeap.dump(path);
     }
 
     /**

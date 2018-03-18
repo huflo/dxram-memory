@@ -572,7 +572,7 @@ public final class MemoryTesting {
      * Print the heap structure
      */
     public boolean analyze(){
-        return new MemoryManagerAnalyzer(m, false, false).analyze();
+        return memory.analyzer.analyze(false, false);
     }
 
     /**
@@ -583,7 +583,7 @@ public final class MemoryTesting {
      */
     @SuppressWarnings("UnusedReturnValue")
     public boolean checkForError(final boolean p_dumpOnError){
-        return new MemoryManagerAnalyzer(m, true, p_dumpOnError).analyze();
+        return memory.analyzer.analyze(true, p_dumpOnError);
     }
 
 }

@@ -33,6 +33,7 @@ public class MemoryManager {
     final MemoryInformation memoryInformation;
     final MemoryManagement memoryManagement;
     final MemoryPinning memoryPinning;
+    final MemoryAnalyzer analyzer;
 
     private boolean m_readLock = true;
     private boolean m_writeLock = true;
@@ -49,6 +50,7 @@ public class MemoryManager {
 
         memoryInformation.numActiveChunks = 0;
         memoryInformation.totalActiveChunkMemory = 0;
+        analyzer = new MemoryAnalyzer(this);
     }
 
     //Manage------------------------------------------------------------------------------------------------------------
@@ -61,7 +63,7 @@ public class MemoryManager {
      * @return True if no error was found, else false
      */
     public boolean checkForErrors(final boolean quiet, final boolean dumpOnError){
-        return new MemoryManagerAnalyzer(this, quiet, dumpOnError).analyze();
+        return new MemoryAnalyzer(this).analyze(quiet, dumpOnError);
     }
 
     /**
