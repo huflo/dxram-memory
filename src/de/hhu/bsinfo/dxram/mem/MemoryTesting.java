@@ -52,8 +52,8 @@ public final class MemoryTesting {
     /**
      * Create a testing instance
      */
-    public MemoryTesting(final short p_nodeID, final long p_heapSize, final int p_maxBlockSize){
-        m = new MemoryManager(p_nodeID, p_heapSize, p_maxBlockSize);
+    public MemoryTesting(final MemoryManager memoryManager){
+        m = memoryManager;
     }
 
     /**
@@ -212,9 +212,8 @@ public final class MemoryTesting {
      * @param nOperations Operation count
      * @param nThreads Active threads at the same time
      * @param writeProbability Probability of a write access
-     * @throws InterruptedException Termination can throw this exception
      */
-    public final void lockTestFunctionality(final long nOperations, final int nThreads, final double writeProbability) throws InterruptedException {
+    public final void lockTestFunctionality(final long nOperations, final int nThreads, final double writeProbability) {
         assert nChunks > 0: "Run initHeap(final int p_chunkSize, final int p_nChunks) first";
         ChunkDataManipulationTesting increment = (oldData, selected) -> {
             if(ref[selected] != FastByteUtils.bytesToLong(oldData)){
@@ -245,7 +244,9 @@ public final class MemoryTesting {
         //Perform n operations with the Runnable
         Stopwatch stopwatch = new Stopwatch();
         stopwatch.start();
-        execNOperationsRunnables(nThreads, nThreads, nOperations, r);
+        try {
+            execNOperationsRunnables(nThreads, nThreads, nOperations, r);
+        } catch (InterruptedException ignored) {}
         stopwatch.stop();
 
         TestingMeasurements.add(nThreads, stopwatch.toString());
@@ -270,7 +271,7 @@ public final class MemoryTesting {
      * @param writeProbability Probability of a write access
      * @throws InterruptedException Termination can throw this exception
      */
-    public final void lockTestSpeed(final long nOperations, final int nThreads, final double writeProbability) throws InterruptedException {
+    public final void lockTestSpeed(final long nOperations, final int nThreads, final double writeProbability) {
         assert nChunks > 0: "Run initHeap(final int p_chunkSize, final int p_nChunks) first";
 
         ByteDataManipulation increment = (byte[] oldData) -> FastByteUtils.longToBytes(FastByteUtils.bytesToLong(oldData) + 1);
@@ -292,7 +293,9 @@ public final class MemoryTesting {
         //Perform n operations with the Runnable
         Stopwatch stopwatch = new Stopwatch();
         stopwatch.start();
-        execNOperationsRunnables(nThreads, nThreads, nOperations, r);
+        try {
+            execNOperationsRunnables(nThreads, nThreads, nOperations, r);
+        } catch (InterruptedException ignored) {}
         stopwatch.stop();
 
         TestingMeasurements.add(nThreads, stopwatch.toString());
@@ -306,7 +309,7 @@ public final class MemoryTesting {
      * @param nOperations How many string we want create
      * @param strings String we want to write
      */
-    public final void createAndWriteStringObjects(final long nOperations, final int nThreads, final String[] strings, final boolean testData) throws InterruptedException {
+    public final void createAndWriteStringObjects(final long nOperations, final int nThreads, final String[] strings, final boolean testData) {
         boolean delete = false;
 
         //Runnable
@@ -319,7 +322,9 @@ public final class MemoryTesting {
 
         Stopwatch stopwatch = new Stopwatch();
         stopwatch.start();
-        execNOperationsRunnables(nThreads, nThreads, nOperations, r);
+        try {
+            execNOperationsRunnables(nThreads, nThreads, nOperations, r);
+        } catch (InterruptedException ignored) {}
         stopwatch.stop();
         TestingMeasurements.add(nThreads, stopwatch.toString());
 
@@ -406,7 +411,7 @@ public final class MemoryTesting {
      */
     public final void memoryManagementTest(final long nOperations, final int nThreads, final double createProbability,
                                      final double readProbability, final double changeProbability, final long minDelayInMS,
-                                     final long maxDelay, final int minSize, final int maxSizeInByte) throws InterruptedException {
+                                     final long maxDelay, final int minSize, final int maxSizeInByte) {
 
         ByteDataManipulation increment = (byte[] oldData) -> FastByteUtils.longToBytes(FastByteUtils.bytesToLong(oldData) + 1);
 
@@ -447,7 +452,9 @@ public final class MemoryTesting {
 
         Stopwatch stopwatch = new Stopwatch();
         stopwatch.start();
-        execNOperationsRunnables(nThreads, nThreads, nOperations, r);
+        try {
+            execNOperationsRunnables(nThreads, nThreads, nOperations, r);
+        } catch (InterruptedException ignored) {}
         stopwatch.stop();
 
         TestingMeasurements.add(nThreads, stopwatch.toString());
@@ -468,7 +475,7 @@ public final class MemoryTesting {
      * @param maxSize
      *          Maximal size of a chunk
      */
-    public final void createDeleteTest(final long timeToRun, final int nThreads, final double createProbability, final int minSize, final int maxSize) throws InterruptedException {
+    public final void createDeleteTest(final long timeToRun, final int nThreads, final double createProbability, final int minSize, final int maxSize) {
         AtomicLong readCount = new AtomicLong(0);
         AtomicLong writeCount = new AtomicLong(0);
         //Create a Runnable
@@ -489,7 +496,9 @@ public final class MemoryTesting {
 
         };
 
-        execMaxTimeRunnables(nThreads, nThreads, timeToRun, r);
+        try {
+            execMaxTimeRunnables(nThreads, nThreads, timeToRun, r);
+        } catch (InterruptedException ignored) {}
 
         LOGGER.info("reads: %d, writes: %d", readCount.get(), writeCount.get());
     }
