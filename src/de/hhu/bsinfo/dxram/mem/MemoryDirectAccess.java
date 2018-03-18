@@ -15,8 +15,8 @@ public class MemoryDirectAccess {
     private static final Logger LOGGER = LogManager.getFormatterLogger(MemoryDirectAccess.class.getSimpleName());
 
 
-    private final SmallObjectHeap m_rawMemory;
-    private final CIDTable m_cidTable;
+    private final SmallObjectHeap smallObjectHeap;
+    private final CIDTable cidTable;
 
 
     /**
@@ -27,8 +27,8 @@ public class MemoryDirectAccess {
      *
      */
     MemoryDirectAccess(MemoryManager memoryManager) {
-        m_rawMemory = memoryManager.smallObjectHeap;
-        m_cidTable = memoryManager.cidTable;
+        smallObjectHeap = memoryManager.smallObjectHeap;
+        cidTable = memoryManager.cidTable;
     }
 
     /**
@@ -43,14 +43,14 @@ public class MemoryDirectAccess {
      */
     public byte readByte(final long p_chunkID, final int p_offset) throws MemoryRuntimeException {
         try {
-            long entry = m_cidTable.get(p_chunkID);
+            long entry = cidTable.get(p_chunkID);
             if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                return m_rawMemory.readByte(entry, p_offset);
+                return smallObjectHeap.readByte(entry, p_offset);
             } else {
                 return -1;
             }
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         }
     }
@@ -67,14 +67,14 @@ public class MemoryDirectAccess {
      */
     public short readShort(final long p_chunkID, final int p_offset) throws MemoryRuntimeException {
         try {
-            long entry = m_cidTable.get(p_chunkID);
+            long entry = cidTable.get(p_chunkID);
             if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                return m_rawMemory.readShort(entry, p_offset);
+                return smallObjectHeap.readShort(entry, p_offset);
             } else {
                 return -1;
             }
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         }
     }
@@ -91,14 +91,14 @@ public class MemoryDirectAccess {
      */
     public int readInt(final long p_chunkID, final int p_offset) throws MemoryRuntimeException {
         try {
-            long entry = m_cidTable.get(p_chunkID);
+            long entry = cidTable.get(p_chunkID);
             if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                return m_rawMemory.readInt(entry, p_offset);
+                return smallObjectHeap.readInt(entry, p_offset);
             } else {
                 return -1;
             }
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         }
     }
@@ -116,14 +116,14 @@ public class MemoryDirectAccess {
     public long readLong(final long p_chunkID, final int p_offset) throws MemoryRuntimeException {
 
         try {
-            long entry = m_cidTable.get(p_chunkID);
+            long entry = cidTable.get(p_chunkID);
             if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                return m_rawMemory.readLong(entry, p_offset);
+                return smallObjectHeap.readLong(entry, p_offset);
             } else {
                 return -1;
             }
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         }
     }
@@ -142,14 +142,14 @@ public class MemoryDirectAccess {
      */
     public boolean writeByte(final long p_chunkID, final int p_offset, final byte p_value) throws MemoryRuntimeException {
         try {
-            long entry = m_cidTable.get(p_chunkID);
+            long entry = cidTable.get(p_chunkID);
             if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                m_rawMemory.writeByte(entry, p_offset, p_value);
+                smallObjectHeap.writeByte(entry, p_offset, p_value);
             } else {
                 return false;
             }
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         }
 
@@ -170,14 +170,14 @@ public class MemoryDirectAccess {
      */
     public boolean writeShort(final long p_chunkID, final int p_offset, final short p_value) throws MemoryRuntimeException {
         try {
-            long entry = m_cidTable.get(p_chunkID);
+            long entry = cidTable.get(p_chunkID);
             if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                m_rawMemory.writeShort(entry, p_offset, p_value);
+                smallObjectHeap.writeShort(entry, p_offset, p_value);
             } else {
                 return false;
             }
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         }
 
@@ -198,14 +198,14 @@ public class MemoryDirectAccess {
      */
     public boolean writeInt(final long p_chunkID, final int p_offset, final int p_value) throws MemoryRuntimeException {
         try {
-            long entry = m_cidTable.get(p_chunkID);
+            long entry = cidTable.get(p_chunkID);
             if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                m_rawMemory.writeInt(entry, p_offset, p_value);
+                smallObjectHeap.writeInt(entry, p_offset, p_value);
             } else {
                 return false;
             }
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         }
 
@@ -226,14 +226,14 @@ public class MemoryDirectAccess {
      */
     public boolean writeLong(final long p_chunkID, final int p_offset, final long p_value) throws MemoryRuntimeException {
         try {
-            long entry = m_cidTable.get(p_chunkID);
+            long entry = cidTable.get(p_chunkID);
             if (entry != CIDTable.FREE_ENTRY && entry != CIDTable.ZOMBIE_ENTRY) {
-                m_rawMemory.writeLong(entry, p_offset, p_value);
+                smallObjectHeap.writeLong(entry, p_offset, p_value);
             } else {
                 return false;
             }
         } catch (final MemoryRuntimeException e) {
-            MemoryError.handleMemDumpOnError(m_rawMemory, e, ".", false, LOGGER);
+            MemoryError.handleMemDumpOnError(smallObjectHeap, e, ".", false, LOGGER);
             throw e;
         }
 
