@@ -188,11 +188,11 @@ final class CIDTable {
 
         ret = new ArrayListLong();
         for (int i = 0; i < ENTRIES_FOR_NID_LEVEL; i++) {
-            entry = ADDRESS.get(readEntry(m_addressTableDirectory, i,NID_TABLE_SIZE));
+            entry = ADDRESS.get(readEntry(m_addressTableDirectory, i));
             if (entry > 0) {
                 if (i == (m_ownNodeID & 0xFFFF)) {
                     getAllRanges(ret, (long) i << 48,
-                            ADDRESS.get(readEntry(m_addressTableDirectory, i & NID_LEVEL_BITMASK, NID_TABLE_SIZE)),
+                            ADDRESS.get(readEntry(m_addressTableDirectory, i & NID_LEVEL_BITMASK)),
                             LID_TABLE_LEVELS - 1);
                 }
             }
@@ -212,10 +212,10 @@ final class CIDTable {
 
         ret = new ArrayListLong();
         for (int i = 0; i < ENTRIES_FOR_NID_LEVEL; i++) {
-            entry = ADDRESS.get(readEntry(m_addressTableDirectory, i, NID_TABLE_SIZE));
+            entry = ADDRESS.get(readEntry(m_addressTableDirectory, i));
             if (entry > 0 && i != (m_ownNodeID & 0xFFFF)) {
                 getAllRanges(ret, (long) i << 48,
-                        ADDRESS.get(readEntry(m_addressTableDirectory, i & NID_LEVEL_BITMASK, NID_TABLE_SIZE)),
+                        ADDRESS.get(readEntry(m_addressTableDirectory, i & NID_LEVEL_BITMASK)),
                         LID_TABLE_LEVELS - 1);
             }
         }
@@ -273,7 +273,7 @@ final class CIDTable {
         if(p_directEntryAddress == SmallObjectHeap.INVALID_ADDRESS){
             return 0;
         } else {
-            return readEntry(p_directEntryAddress, 0, LID_TABLE_SIZE);
+            return m_rawMemory.directReadLong(p_directEntryAddress);
         }
     }
 
@@ -290,7 +290,7 @@ final class CIDTable {
         if(p_directEntryAddress == SmallObjectHeap.INVALID_ADDRESS)
             return false;
         else {
-            writeEntry(p_directEntryAddress, 0, p_chunkEntry, LID_TABLE_SIZE);
+            m_rawMemory.directWriteLong(p_directEntryAddress, p_chunkEntry);
             return true;
         }
     }
@@ -331,7 +331,7 @@ final class CIDTable {
      * @return The entry of the chunk which was removed from the table.
      */
     long delete(final long p_chunkID, final boolean p_flagZombie) {
-        long directAddress = getAddressOfEntry(p_chunkID, false, false);
+        long directAddress = getAddressOfEntry(p_chunkID, false, true);
 
         return directDelete(directAddress, p_flagZombie);
     }
@@ -411,7 +411,7 @@ final class CIDTable {
             }
 
             if (level > 0) {
-                entry = readEntry(addressTable, index, LID_TABLE_SIZE);
+                entry = readEntry(addressTable, index);
 
                 if (entry == FREE_ENTRY || entry == ZOMBIE_ENTRY) {
                     if(p_createNew){
@@ -419,14 +419,14 @@ final class CIDTable {
                         if (entry == SmallObjectHeap.INVALID_ADDRESS) {
                             break;
                         }
-                        writeEntry(addressTable, index, entry, LID_TABLE_SIZE);
+                        writeEntry(addressTable, index, entry);
                     } else {
                         break;
                     }
                 }
 
                 if(p_deleteFullFlag)
-                    FULL_FLAG.set(entry, false);
+                    entry = FULL_FLAG.set(entry, false);
 
                 // move on to next table
                 addressTable = ADDRESS.get(entry);
@@ -478,28 +478,23 @@ final class CIDTable {
      *     the table
      * @param p_index
      *     the index of the entry
-     * @param p_tableSize
-     *     the size of the table
      * @return the entry
      */
-    long readEntry(final long p_addressTable, final long p_index, final long p_tableSize) {
-        return m_rawMemory.readLongRaw(p_addressTable, ENTRY_SIZE * p_index, p_tableSize);
+    long readEntry(final long p_addressTable, final long p_index) {
+        return m_rawMemory.directReadLong(p_addressTable + p_index*ENTRY_SIZE);
     }
 
     /**
      * Writes a table entry
-     *
-     * @param p_addressTable
+     *  @param p_addressTable
      *     the table
      * @param p_index
      *     the index of the entry
      * @param p_entry
-     *     the entry
-     * @param p_tableSize
-     *     the size of the table
+ *     the entry
      */
-    private void writeEntry(final long p_addressTable, final long p_index, final long p_entry, final long p_tableSize) {
-        m_rawMemory.writeLongRaw(p_addressTable, ENTRY_SIZE * p_index, p_entry, p_tableSize);
+    private void writeEntry(final long p_addressTable, final long p_index, final long p_entry) {
+        m_rawMemory.directWriteLong(p_addressTable + p_index*ENTRY_SIZE, p_entry);
     }
 
     /**
@@ -528,7 +523,7 @@ final class CIDTable {
         long value;
 
         while(run) {
-            value = m_rawMemory.readLongRaw(p_directEntryAddress, 0, LID_TABLE_SIZE);
+            value = m_rawMemory.directReadLong(p_directEntryAddress);
 
             //check if entry is alive
             if(value == FREE_ENTRY || value == ZOMBIE_ENTRY)
@@ -545,7 +540,7 @@ final class CIDTable {
                 continue;
             }
 
-            if (m_rawMemory.compareAndSwapLong(p_directEntryAddress, value, value + READ_INCREMENT))
+            if (m_rawMemory.directCompareAndSwapLong(p_directEntryAddress, value, value + READ_INCREMENT))
                 break;
 
             Thread.yield();
@@ -578,7 +573,7 @@ final class CIDTable {
         long value;
 
         while(run){
-            value = m_rawMemory.readLongRaw(p_directEntryAddress, 0, LID_TABLE_SIZE);
+            value = m_rawMemory.directReadLong(p_directEntryAddress);
 
             //check if entry is alive
             if(value == FREE_ENTRY || value == ZOMBIE_ENTRY)
@@ -588,7 +583,7 @@ final class CIDTable {
             if((value & READ_ACCESS.BITMASK) == 0)
                 return false;
 
-            if(m_rawMemory.compareAndSwapLong(p_directEntryAddress, value, value - READ_INCREMENT))
+            if(m_rawMemory.directCompareAndSwapLong(p_directEntryAddress, value, value - READ_INCREMENT))
                 break;
 
             Thread.yield();
@@ -620,7 +615,7 @@ final class CIDTable {
         long value;
 
         while(run){
-            value = m_rawMemory.readLongRaw(p_directEntryAddress, 0, LID_TABLE_SIZE);
+            value = m_rawMemory.directReadLong(p_directEntryAddress);
 
             //check if entry is alive
             if(value == FREE_ENTRY || value == ZOMBIE_ENTRY)
@@ -631,12 +626,12 @@ final class CIDTable {
                 continue;
             }
 
-            if(m_rawMemory.compareAndSwapLong(p_directEntryAddress, value, value | WRITE_ACCESS.BITMASK))
+            if(m_rawMemory.directCompareAndSwapLong(p_directEntryAddress, value, value | WRITE_ACCESS.BITMASK))
                 break;
         }
 
         // wait until no present read access
-        while((m_rawMemory.readLongRaw(p_directEntryAddress, 0, LID_TABLE_SIZE) & READ_ACCESS.BITMASK) != 0){
+        while((m_rawMemory.directReadLong(p_directEntryAddress) & READ_ACCESS.BITMASK) != 0){
             Thread.yield();
         }
 
@@ -668,7 +663,7 @@ final class CIDTable {
 
         // delete write access flag
         while(run){
-            value = m_rawMemory.readLongRaw(p_directEntryAddress, 0, LID_TABLE_SIZE);
+            value = m_rawMemory.directReadLong(p_directEntryAddress);
 
             //Check if entry is alive
             if(value == FREE_ENTRY || value == ZOMBIE_ENTRY)
@@ -677,7 +672,7 @@ final class CIDTable {
             if((value & WRITE_ACCESS.BITMASK) == 0)
                 return false;
 
-            if(m_rawMemory.compareAndSwapLong(p_directEntryAddress, value, value & ~WRITE_ACCESS.BITMASK))
+            if(m_rawMemory.directCompareAndSwapLong(p_directEntryAddress, value, value & ~WRITE_ACCESS.BITMASK))
                 break;
         }
 
@@ -706,7 +701,7 @@ final class CIDTable {
 
         //MemoryManagerComponent.SOP_MALLOC.enter(NID_TABLE_SIZE);
         // #endif /* STATISTICS */
-        ret = m_rawMemory.mallocRaw(NID_TABLE_SIZE);
+        ret = m_rawMemory.directMalloc(NID_TABLE_SIZE);
         // #ifdef STATISTICS
         //MemoryManagerComponent.SOP_MALLOC.leave();
         // #endif /* STATISTICS */
@@ -735,7 +730,7 @@ final class CIDTable {
 
         //MemoryManagerComponent.SOP_MALLOC.enter(LID_TABLE_SIZE);
         // #endif /* STATISTICS */
-        ret = m_rawMemory.mallocRaw(LID_TABLE_SIZE);
+        ret = m_rawMemory.directMalloc(LID_TABLE_SIZE);
         // #ifdef STATISTICS
         //MemoryManagerComponent.SOP_MALLOC.leave();
         // #endif /* STATISTICS */
@@ -765,7 +760,7 @@ final class CIDTable {
         long entry;
 
         for (int i = 0; i < ENTRIES_PER_LID_LEVEL; i++) {
-            entry = readEntry(p_table, i, LID_TABLE_SIZE);
+            entry = readEntry(p_table, i);
             if (entry > 0) {
 
                 if (p_level > 0) {
@@ -837,12 +832,12 @@ final class CIDTable {
 
         long entry;
         while (run) {
-            entry = m_rawMemory.readLongRaw(p_directEntryAddress, 0, LID_TABLE_SIZE);
+            entry = m_rawMemory.directReadLong(p_directEntryAddress);
 
             if(entry == FREE_ENTRY && entry == ZOMBIE_ENTRY)
                 return false;
 
-            if(m_rawMemory.compareAndSwapLong(p_directEntryAddress, entry, p_state.set(entry, p_newState)))
+            if(m_rawMemory.directCompareAndSwapLong(p_directEntryAddress, entry, p_state.set(entry, p_newState)))
                 break;
         }
 
@@ -994,7 +989,7 @@ final class CIDTable {
          */
         private void findFreeLIDs() {
             findFreeLIDs(ADDRESS.get(readEntry(m_addressTableDirectory,
-                    m_ownNodeID & NID_LEVEL_BITMASK, NID_TABLE_SIZE)),
+                    m_ownNodeID & NID_LEVEL_BITMASK)),
                     LID_TABLE_LEVELS - 1, 0);
         }
 
@@ -1016,7 +1011,7 @@ final class CIDTable {
 
             for (int i = 0; i < ENTRIES_PER_LID_LEVEL; i++) {
                 // Read table entry
-                entry = readEntry(p_addressTable, i, LID_TABLE_SIZE);
+                entry = readEntry(p_addressTable, i);
 
                 if (p_level > 0) {
                     if (entry > 0) {
@@ -1024,7 +1019,7 @@ final class CIDTable {
                         if (!findFreeLIDs(ADDRESS.get(entry), p_level - 1, i << BITS_PER_LID_LEVEL * p_level)) {
                             // Mark the table as full
                             entry = FULL_FLAG.set(entry, true);
-                            writeEntry(p_addressTable, i, entry, LID_TABLE_SIZE);
+                            writeEntry(p_addressTable, i, entry);
                         } else {
                             ret = true;
                         }
@@ -1035,7 +1030,7 @@ final class CIDTable {
                         localID = p_offset + i;
 
                         // cleanup zombie in table
-                        writeEntry(p_addressTable, i, FREE_ENTRY, LID_TABLE_SIZE);
+                        writeEntry(p_addressTable, i, FREE_ENTRY);
 
                         m_localIDs[m_putPosition] = localID;
                         m_putPosition = (m_putPosition + 1) % m_localIDs.length;
@@ -1157,7 +1152,7 @@ final class CIDTable {
          */
         private long getCID(){
             for (int i = 0; i < ENTRIES_FOR_NID_LEVEL && !found; i++) {
-                long entry = readEntry(m_addressTableDirectory, i, NID_TABLE_SIZE);
+                long entry = readEntry(m_addressTableDirectory, i);
                 if(entry != FREE_ENTRY && entry != ZOMBIE_ENTRY)
                     getCID(LID_TABLE_LEVELS-1, ADDRESS.get(entry), i);
             }
@@ -1176,7 +1171,7 @@ final class CIDTable {
             long entry;
 
             for (int i = 0; i < ENTRIES_PER_LID_LEVEL && !found; i++) {
-                entry = readEntry(tableAddress, i, LID_TABLE_SIZE);
+                entry = readEntry(tableAddress, i);
                 if(entry != FREE_ENTRY && entry != ZOMBIE_ENTRY) {
                     if (level > 0) {
                         long address = ADDRESS.get(entry);

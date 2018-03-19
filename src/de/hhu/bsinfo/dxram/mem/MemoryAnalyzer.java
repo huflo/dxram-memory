@@ -272,7 +272,7 @@ final public class MemoryAnalyzer {
 
                 //iterate over all table entries
                 for (int i = 0; i < tableEntries; i++) {
-                    entry = cidTable.readEntry(curTable, i, tableSize);
+                    entry = cidTable.readEntry(curTable, i);
                     if( entry == 0 || entry == ZOMBIE_ENTRY) {
                         continue;
                     }
@@ -440,7 +440,7 @@ final public class MemoryAnalyzer {
 
         int countActive = 0;
         for (int i = 0; i < numberEntries; i++) {
-            entry = cidTable.readEntry(p_tableAddress, i, sizeTable);
+            entry = cidTable.readEntry(p_tableAddress, i);
 
             if(entry == 0) freeEntries++;
             else if(entry == ZOMBIE_ENTRY) zombieEntries++;

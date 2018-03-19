@@ -282,7 +282,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
      *          size of the block in bytes
      * @return the address of the block or 0 if no free blocks available for the specified size
      */
-    public long mallocRaw(final int p_size){
+    public long directMalloc(final int p_size){
         return reserveBlock(p_size, true);
     }
 
@@ -416,7 +416,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
      * @param p_blockSize
      *         Information about the chunk size which are stored externally
      */
-    void freeRaw(final long p_address, final int p_blockSize) {
+    void directFree(final long p_address, final int p_blockSize) {
         freeReservedBlock(p_address, 0, p_blockSize);
     }
 
@@ -578,15 +578,11 @@ public final class SmallObjectHeap implements Importable, Exportable {
      * Read a long from specified raw block address + offset.
      * A raw block contain no information about the own structure
      *
-     * @param p_address Raw block address.
-     * @param p_offset Offset to add to the address.
-     * @param p_size Size of the block.
+     * @param p_directAddress Direct block address.
      * @return Long read.
      */
-    long readLongRaw(final long p_address, final long p_offset, final long p_size){
-        assertMemoryBlockBounds(p_address, 0, p_size, p_offset, Long.BYTES);
-
-        return m_memory.readLong(p_address + p_offset);
+    long directReadLong(final long p_directAddress){
+        return m_memory.readLong(p_directAddress);
     }
 
     /**
@@ -852,18 +848,13 @@ public final class SmallObjectHeap implements Importable, Exportable {
     }
 
     /**
-     * Write a long to specified raw block address + offset.
-     * A raw block contain no information about the own structure
+     * Write a long to specified direct address. This method don't check the block boundaries.
      *
-     * @param p_address Raw block address.
-     * @param p_offset Offset to add to the address.
+     * @param p_directAddress Direct block address.
      * @param p_value Long to write.
-     * @param p_size Size of the block.
      */
-    void writeLongRaw(final long p_address, final long p_offset, final long p_value, final long p_size){
-        assertMemoryBlockBounds(p_address, 0, p_size, p_offset, Long.BYTES);
-
-        m_memory.writeLong(p_address + p_offset, p_value);
+    void directWriteLong(final long p_directAddress, final long p_value){
+        m_memory.writeLong(p_directAddress, p_value);
     }
 
     /**
@@ -1832,7 +1823,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
 
     /**
      * Do a compare and swap operation on a long value.
-     * This method works with the direct address of a long variable.
+     * This method works with the direct address of a long variable and don't check block boundaries.
      *
      * @param p_directAddress
      *          address of the long
@@ -1843,7 +1834,7 @@ public final class SmallObjectHeap implements Importable, Exportable {
      * @return
      *          is the data replaced?
      */
-    boolean compareAndSwapLong(final long p_directAddress, final long p_expectedData, final long p_newData){
+    boolean directCompareAndSwapLong(final long p_directAddress, final long p_expectedData, final long p_newData){
         return m_memory.compareAndSwapLong(p_directAddress, p_expectedData, p_newData);
     }
 
