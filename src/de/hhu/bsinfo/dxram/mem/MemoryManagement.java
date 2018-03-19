@@ -130,7 +130,7 @@ public class MemoryManagement {
     long create(final int p_size) throws OutOfKeyValueStoreMemoryException, MemoryRuntimeException {
         assert p_size > 0;
 
-        long[] entryPosition;
+        long directEntryAddress;
 
         long address;
         long chunkID;
@@ -164,10 +164,10 @@ public class MemoryManagement {
                 chunkID = ((long) NODE_ID << 48) + lid;//<<
 
                 entry = createEntry(address, p_size);
-                entryPosition = m_cidTable.getAddressOfEntryCreate(chunkID);
+                directEntryAddress = m_cidTable.getAddressOfEntryCreate(chunkID);
 
                 // register new chunk in cid table
-                if (!m_cidTable.set(chunkID, entry)) {
+                if (!m_cidTable.directSet(directEntryAddress, entry)) {
                     // on demand allocation of new table failed
                     // free previously created chunk for data to avoid memory leak
                     m_rawMemory.free(address, p_size);
@@ -215,7 +215,7 @@ public class MemoryManagement {
     long create(final long p_chunkId, final int p_size) throws OutOfKeyValueStoreMemoryException, MemoryRuntimeException {
         assert p_size > 0;
 
-        long[] entryPosition;
+        long directEntryAddress;
 
         long address;
         long chunkID = ChunkID.INVALID_ID;
@@ -231,14 +231,14 @@ public class MemoryManagement {
             // #endif /* STATISTICS */
 
             // verify this id is not used
-            entryPosition = m_cidTable.getAddressOfEntryCreate(p_chunkId);
-            long entry = m_cidTable.get(entryPosition);
+            directEntryAddress = m_cidTable.getAddressOfEntryCreate(p_chunkId);
+            long entry = m_cidTable.directGet(directEntryAddress);
             if (entry == CIDTable.ZOMBIE_ENTRY || entry == CIDTable.FREE_ENTRY) {
                 address = m_rawMemory.malloc(p_size);
                 if (address > SmallObjectHeap.INVALID_ADDRESS) {
                     // register new chunk
                     // register new chunk in cid table
-                    if (!m_cidTable.set(entryPosition, createEntry(address, p_size))) {
+                    if (!m_cidTable.directSet(directEntryAddress, createEntry(address, p_size))) {
                         // on demand allocation of new table failed
                         // free previously created chunk for data to avoid memory leak
                         m_rawMemory.free(address, p_size);
@@ -643,7 +643,7 @@ public class MemoryManagement {
     int remove(final long p_chunkID, final boolean p_wasMigrated) {
         int ret = -1;
 
-        long[] entryPosition;
+        long directEntryAddress;
         long entry;
         long addressDeletedChunk;
         long size;
@@ -654,8 +654,8 @@ public class MemoryManagement {
         // #endif /* LOGGER == TRACE */
 
         if (p_chunkID != ChunkID.INVALID_ID &&
-                (entryPosition = m_cidTable.getAddressOfEntry(p_chunkID)) != null &&
-                m_memManagement.writeLock(entryPosition)) {
+                (directEntryAddress = m_cidTable.getAddressOfEntry(p_chunkID)) != SmallObjectHeap.INVALID_ADDRESS &&
+                m_memManagement.switchableWriteLock(directEntryAddress)) {
             lockManage();
             try {
                 // #ifdef STATISTICS
@@ -663,7 +663,7 @@ public class MemoryManagement {
                 // #endif /* STATISTICS */
 
                 // Get and delete the address from the CIDTable, mark as zombie first
-                entry = m_cidTable.get(entryPosition);
+                entry = m_cidTable.directGet(directEntryAddress);
                 if(STATE_NOT_MOVEABLE.get(entry) || STATE_NOT_REMOVEABLE.get(entry)){
                     unlockManage();
                     LOGGER.info("CID: %d is not remove able!!!!", p_chunkID);
@@ -673,7 +673,7 @@ public class MemoryManagement {
                 if(deleted)
                     return -1;
 
-                m_cidTable.set(entryPosition, CIDTable.ZOMBIE_ENTRY);
+                m_cidTable.directSet(directEntryAddress, CIDTable.ZOMBIE_ENTRY);
                 addressDeletedChunk = ADDRESS.get(entry);
                 size = LENGTH_FIELD.get(entry) + 1; //+1 because of the offset
 
@@ -681,12 +681,12 @@ public class MemoryManagement {
 
                     if (p_wasMigrated) {
                         // deleted and previously migrated chunks don't end up in the LID store
-                        m_cidTable.set(p_chunkID, CIDTable.FREE_ENTRY);
+                        m_cidTable.directSet(directEntryAddress, CIDTable.FREE_ENTRY);
                     } else {
                         // more space for another zombie for reuse in LID store?
                         if (m_cidTable.putChunkIDForReuse(ChunkID.getLocalID(p_chunkID))) {
                             // kill zombie entry
-                            m_cidTable.set(p_chunkID, CIDTable.FREE_ENTRY);
+                            m_cidTable.directSet(directEntryAddress, CIDTable.FREE_ENTRY);
                         } else {
                             // no space for zombie in LID store, keep him "alive" in table
                         }
@@ -707,7 +707,7 @@ public class MemoryManagement {
                 //handleMemDumpOnError(e, false);
                 throw e;
             } finally {
-                m_memManagement.writeUnlock(entryPosition);
+                m_memManagement.switchableWriteUnlock(directEntryAddress);
                 unlockManage();
             }
         }

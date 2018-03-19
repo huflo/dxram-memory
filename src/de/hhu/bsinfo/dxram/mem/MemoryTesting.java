@@ -356,19 +356,19 @@ public final class MemoryTesting {
      *
      * @param nChunks Chunks we want to test.
      */
-    public void pinningFunctional(int nChunks){
-        int blockSize = 50;
+    public void pinningFunctional(int nChunks, int blockSize){
         byte[] data = new byte[blockSize];
 
         for (int i = 0; i < data.length; i++) {
             data[i] = (byte) i;
         }
 
-        long[] cids = m.createMulti(50,nChunks);
+        long[] cids = m.createMulti(blockSize,nChunks);
         long[] entry = new long[nChunks];
 
         for (int i = 0; i < nChunks; i++) {
             entry[i] = m.pinChunk(cids[i]); //Pinning ok?
+
             m.remove(cids[i], false); //Flag ok?
 
             m.putPinned(entry[i], data); //put ok?
@@ -480,7 +480,7 @@ public final class MemoryTesting {
         AtomicLong writeCount = new AtomicLong(0);
         //Create a Runnable
         Runnable r = () -> {
-            wait(1L,3L);
+            wait(0L,0L);
 
             if(Math.random() < createProbability){
                 int size = (int)getRandom(minSize, maxSize);

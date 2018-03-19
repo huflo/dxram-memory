@@ -234,7 +234,6 @@ final class MemoryManagerAnalyzer {
         long curTable;
         long entry;
         long tableEntries = ENTRIES_FOR_NID_LEVEL;
-        long tableSize = NID_TABLE_SIZE;
 
 
         //iterate over all level bigger than level 0
@@ -242,13 +241,12 @@ final class MemoryManagerAnalyzer {
             try {
                 if(level != LID_TABLE_LEVELS){
                     tableEntries = ENTRIES_PER_LID_LEVEL;
-                    tableSize = LID_TABLE_SIZE;
                 }
                 curTable = ADDRESS.get(tables.get(counter++));
 
                 //iterate over all table entries
                 for (int i = 0; i < tableEntries; i++) {
-                    entry = m_table.readEntry(curTable, i, tableSize);
+                    entry = m_table.readEntry(curTable, i);
                     if( entry == 0 || entry == ZOMBIE_ENTRY)
                         continue;
 
@@ -407,7 +405,7 @@ final class MemoryManagerAnalyzer {
 
         int countActive = 0;
         for (int i = 0; i < numberEntries; i++) {
-            entry = m_table.readEntry(p_tableAddress, i, sizeTable);
+            entry = m_table.readEntry(p_tableAddress, i);
 
             if(entry == 0) freeEntries++;
             else if(entry == ZOMBIE_ENTRY) zombieEntries++;
