@@ -22,8 +22,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * @projectname dxram-memory
  */
 @SuppressWarnings("unused")
-public class Evaluation {
-    private static final Logger LOGGER = LogManager.getFormatterLogger(Evaluation.class.getSimpleName());
+public class MemoryEvaluation {
+    private static final Logger LOGGER = LogManager.getFormatterLogger(MemoryEvaluation.class.getSimpleName());
     private static final DateFormat df = new SimpleDateFormat("yyyy-MM-dd_-_HH-mm-ss");
 
     private final MemoryManager memory;
@@ -53,8 +53,8 @@ public class Evaluation {
      * @param p_memoryManager The memory unit
      * @param p_resultPath The path for  measurement results
      */
-    public Evaluation(final MemoryManager p_memoryManager, final String p_resultPath,
-                      final boolean readLock, final boolean writeLock) {
+    public MemoryEvaluation(final MemoryManager p_memoryManager, final String p_resultPath,
+                            final boolean readLock, final boolean writeLock) {
         memory = p_memoryManager;
         memory.setLocks(readLock, writeLock);
 

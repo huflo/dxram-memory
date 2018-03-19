@@ -1,6 +1,6 @@
 package de.hhu.bsinfo.dxram.mem;
 
-import de.hhu.bsinfo.soh.MemoryRuntimeException;
+import de.hhu.bsinfo.dxram.mem.exceptions.MemoryRuntimeException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

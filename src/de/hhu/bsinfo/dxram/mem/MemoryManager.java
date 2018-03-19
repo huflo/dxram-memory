@@ -2,13 +2,13 @@ package de.hhu.bsinfo.dxram.mem;
 
 import de.hhu.bsinfo.dxram.data.ChunkID;
 import de.hhu.bsinfo.dxram.data.ChunkIDRanges;
+import de.hhu.bsinfo.dxram.mem.exceptions.MemoryRuntimeException;
+import de.hhu.bsinfo.dxram.mem.storage.StorageUnsafeMemory;
 import de.hhu.bsinfo.dxutils.serialization.Exportable;
 import de.hhu.bsinfo.dxutils.serialization.Exporter;
 import de.hhu.bsinfo.dxutils.serialization.Importable;
 import de.hhu.bsinfo.dxutils.serialization.Importer;
 import de.hhu.bsinfo.dxutils.unit.StorageUnit;
-import de.hhu.bsinfo.soh.MemoryRuntimeException;
-import de.hhu.bsinfo.soh.StorageUnsafeMemory;
 
 import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.ADDRESS;
 
@@ -190,7 +190,7 @@ public class MemoryManager {
      * @author Florian Hucke (florian.hucke@hhu.de) on 28.02.18
      * @projectname dxram-memory
      */
-    static class MemoryInformation {
+    public static class MemoryInformation {
         long numActiveChunks;
         long totalActiveChunkMemory;
 

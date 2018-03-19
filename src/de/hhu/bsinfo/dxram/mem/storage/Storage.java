@@ -11,7 +11,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
-package de.hhu.bsinfo.soh;
+package de.hhu.bsinfo.dxram.mem.storage;
 
 /**
  * Interface to describe a type of storage/memory to store

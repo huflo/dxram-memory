@@ -11,11 +11,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
-package de.hhu.bsinfo.dxram.mem;
+package de.hhu.bsinfo.dxram.mem.exceptions;
 
+
+import de.hhu.bsinfo.dxram.mem.MemoryManager;
 
 public class OutOfKeyValueStoreMemoryException extends RuntimeException {
-    OutOfKeyValueStoreMemoryException(final MemoryManager.MemoryInformation.Status p_status) {
+    public OutOfKeyValueStoreMemoryException(final MemoryManager.MemoryInformation.Status p_status) {
         super("Out of key value store memory, memory status:\n" + p_status);
     }
 }
