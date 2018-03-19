@@ -1,10 +1,10 @@
 package de.hhu.bsinfo.dxram.mem;
 
-import de.hhu.bsinfo.soh.MemoryRuntimeException;
+import de.hhu.bsinfo.dxram.mem.exceptions.MemoryRuntimeException;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.ADDRESS;
-import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.FULL_FLAG;
-import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.LENGTH_FIELD;
+import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.*;
 
 /**
  * Management of memory accesses to existing objects with known data type

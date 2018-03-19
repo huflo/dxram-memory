@@ -1,9 +1,7 @@
 package de.hhu.bsinfo;
 
-import de.hhu.bsinfo.dxram.mem.Evaluation;
+import de.hhu.bsinfo.dxram.mem.MemoryEvaluation;
 import de.hhu.bsinfo.dxram.mem.MemoryManager;
-
-import java.io.IOException;
 
 public class DXRAMMemory{
 
@@ -45,7 +43,7 @@ public class DXRAMMemory{
         int maxSizeInByte = Integer.parseInt(args[arg]);
 
         MemoryManager memoryManager = new MemoryManager(nodeID, heapSize, blockSize);
-        Evaluation eval = new Evaluation(memoryManager, "./eval/" + branch + "/", readLock, writeLock);
+        MemoryEvaluation eval = new MemoryEvaluation(memoryManager, "./eval/" + branch + "/", readLock, writeLock);
 
         eval.accessSimulation(rounds, nOperations, nThreads, initialChunks, initMinSize, initMaxSize, createProbability,
                 readProbability,writeProbability, minDelayInMS, maxDelay, minSize, maxSizeInByte);

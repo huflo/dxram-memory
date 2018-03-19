@@ -2,7 +2,8 @@ package de.hhu.bsinfo.dxram.mem;
 
 import de.hhu.bsinfo.dxram.data.ChunkID;
 import de.hhu.bsinfo.dxram.data.DataStructure;
-import de.hhu.bsinfo.soh.MemoryRuntimeException;
+import de.hhu.bsinfo.dxram.mem.exceptions.MemoryRuntimeException;
+import de.hhu.bsinfo.dxram.mem.exceptions.OutOfKeyValueStoreMemoryException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -22,7 +23,7 @@ public class MemoryManagement {
     private final MemoryManager m_memManagement;
     private final SmallObjectHeap m_rawMemory;
     private final CIDTable m_cidTable;
-    private final MemoryInformation m_memStats;
+    private final MemoryManager.MemoryInformation m_memStats;
     private final short NODE_ID;
 
     private AtomicInteger m_lock;

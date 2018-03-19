@@ -11,8 +11,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
-package de.hhu.bsinfo.soh;
+package de.hhu.bsinfo.dxram.mem.storage;
 
+import de.hhu.bsinfo.dxram.mem.exceptions.MemoryRuntimeException;
 import de.hhu.bsinfo.dxutils.UnsafeMemory;
 
 /**
