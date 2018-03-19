@@ -646,7 +646,7 @@ public class MemoryManagement {
      * @return The size of the deleted chunk if removing the data was successful, -1 if the chunk with the specified id does not exist
      */
     int remove(final long p_chunkID, final boolean p_wasMigrated) {
-        int ret = (int) ChunkID.INVALID_ID;
+        int ret = -1;
         long directEntryAddress;
         long entry;
 
