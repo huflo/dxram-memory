@@ -6,27 +6,27 @@
 # version: 0.2
 # license: GPL V3
 
+if [ $# -ne 5 ]; then 
+    echo "RUN: $0 HEAPSIZE INITCHUNKS THREADS OPERATIONS ROUNDS"
+    exit 1
+fi
+
 GIT=$(which git)
 [ $? -eq 1 ] && exit 1
 
+CUR_BRANCH=$($GIT rev-parse --abbrev-ref HEAD)
+MAIN_CLASS=de.hhu.bsinfo.DXMemoryEvaluation
+START_EVAL="$PWD/start-dxram-memory.sh $MAIN_CLASS"
+
 nodeID=0
 heapSize=$1
-blockSize=$((2**22)) 
-
-rounds=$4
-nOperations=$2
-nThreads=$3
-initChunks=1000
+initChunks=$2
 initMin=16
 initMax=48
 
-minDelay=0
-maxDelay=0
-minSize=16
-maxSize=2048
-
-readLocks=(true true false)
-writeLocks=(false true true)
+threads=$3
+operations=$4
+rounds=$5
 
 get_branch_names() {
     branches=$(${GIT} branch)
@@ -34,23 +34,16 @@ get_branch_names() {
 }
 
 run_script() {
-    $PWD/start-dxram-memory.sh ${nodeID} ${heapSize} ${blockSize} $2 $3 $1\
-        ${rounds} ${nOperations} ${nThreads} ${initChunks} ${initMin} ${initMax} \
-        $4 $5 $6 ${minDelay} ${maxDelay} ${minSize} ${maxSize}
-
+    $START_EVAL ${nodeID} ${heapSize} $1 ${initChunks} ${initMin} ${initMax} \
+        $threads $operations $rounds
 }
-for branch in $(get_branch_names); do
+
+for branch in "master" "old_logic"; do
     ${GIT} checkout ${branch} &> /dev/null
+    $PWD/build-dxram-memory.sh &> /dev/null
+    [ $? -ne 0 ] && exit 2
 
-    for i in $(seq 0 $((${#readLocks[*]}-1))); do
-        readLock=${readLocks[$i]}
-        writeLock=${writeLocks[$i]}
-
-        run_script ${branch} ${readLock} ${writeLock} 0    0    0
-        run_script ${branch} ${readLock} ${writeLock} 0    0    0.1
-        run_script ${branch} ${readLock} ${writeLock} 0    0    0.5
-        run_script ${branch} ${readLock} ${writeLock} 0.05 0.05 0.8
-        run_script ${branch} ${readLock} ${writeLock} 0.1  0.1  0.4
-
-    done
+    run_script $branch
 done
+
+${GIT} checkout ${CUR_BRANCH} &> /dev/null
