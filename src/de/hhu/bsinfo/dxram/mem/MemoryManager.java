@@ -28,11 +28,11 @@ public class MemoryManager {
 
     final SmallObjectHeap smallObjectHeap;
     final CIDTable cidTable;
-    final MemoryAccess memoryAccess;
-    final MemoryDirectAccess memoryDirectAccess;
-    final MemoryInformation memoryInformation;
-    final MemoryManagement memoryManagement;
-    final MemoryPinning memoryPinning;
+    final MemoryAccess access;
+    final MemoryDirectAccess directAccess;
+    final MemoryInformation info;
+    final MemoryManagement management;
+    final MemoryPinning pinning;
 
     private boolean m_readLock = true;
     private boolean m_writeLock = true;
@@ -41,14 +41,14 @@ public class MemoryManager {
         smallObjectHeap = new SmallObjectHeap(new StorageUnsafeMemory(), p_heapSize, p_maxBlockSize);
         cidTable = new CIDTable(p_nodeID);
         cidTable.initialize(smallObjectHeap);
-        memoryAccess = new MemoryAccess(this);
-        memoryDirectAccess = new MemoryDirectAccess(this);
-        memoryInformation = new MemoryInformation(this);
-        memoryManagement = new MemoryManagement(this);
-        memoryPinning = new MemoryPinning(this);
+        access = new MemoryAccess(this);
+        directAccess = new MemoryDirectAccess(this);
+        info = new MemoryInformation(this);
+        management = new MemoryManagement(this);
+        pinning = new MemoryPinning(this);
 
-        memoryInformation.numActiveChunks = 0;
-        memoryInformation.totalActiveChunkMemory = 0;
+        info.numActiveChunks = 0;
+        info.totalActiveChunkMemory = 0;
     }
 
     //Manage------------------------------------------------------------------------------------------------------------
@@ -73,7 +73,7 @@ public class MemoryManager {
      * @return True if getting the chunk payload was successful, false if no chunk with the ID specified exists.
      */
     public boolean get(final DataStructure p_dataStructure) {
-        return memoryAccess.get(p_dataStructure);
+        return access.get(p_dataStructure);
     }
 
     /**
@@ -86,7 +86,7 @@ public class MemoryManager {
      * @return A byte array with payload if getting the chunk payload was successful, null if no chunk with the ID exists.
      */
     public byte[] get(final long p_chunkID) {
-        return memoryAccess.get(p_chunkID);
+        return access.get(p_chunkID);
     }
 
     /**
@@ -99,7 +99,7 @@ public class MemoryManager {
      * @return the number of read bytes
      */
     public int get(final long p_chunkID, final byte[] p_buffer, final int p_offset, final int p_bufferSize) {
-        return memoryAccess.get(p_chunkID, p_buffer, p_offset, p_bufferSize);
+        return access.get(p_chunkID, p_buffer, p_offset, p_bufferSize);
     }
 
     /**
@@ -112,7 +112,7 @@ public class MemoryManager {
      * @return True if putting the data was successful, false if no chunk with the specified id exists
      */
     public boolean put(final DataStructure p_dataStructure) {
-        return memoryAccess.put(p_dataStructure);
+        return access.put(p_dataStructure);
     }
 
     /**
@@ -127,7 +127,7 @@ public class MemoryManager {
      * @return True if putting the data was successful, false if no chunk with the specified id exists
      */
     public boolean put(final long p_chunkID, final byte[] p_data) {
-        return memoryAccess.put(p_chunkID, p_data);
+        return access.put(p_chunkID, p_data);
     }
 
     /**
@@ -146,7 +146,7 @@ public class MemoryManager {
      * @return True if putting the data was successful, false if no chunk with the specified id exists
      */
     public boolean put(final long p_chunkID, final byte[] p_data, final int p_offset, final int p_length) {
-        return memoryAccess.put(p_chunkID, p_data, p_offset, p_length);
+        return access.put(p_chunkID, p_data, p_offset, p_length);
     }
 
     /**
@@ -161,7 +161,7 @@ public class MemoryManager {
      * @return True if putting the data was successful, false if no chunk with the specified id exists
      */
     boolean modify(final long p_chunkID, ByteDataManipulation byteDataManipulation) {
-        return memoryAccess.modify(p_chunkID, byteDataManipulation);
+        return access.modify(p_chunkID, byteDataManipulation);
     }
 
     //MemoryPinning
@@ -172,7 +172,7 @@ public class MemoryManager {
      * @return The CIDTable entry
      */
     public long pinChunk(final long chunkID){
-        return memoryPinning.pinChunk(chunkID);
+        return pinning.pinChunk(chunkID);
     }
 
     /**
@@ -182,7 +182,7 @@ public class MemoryManager {
      * @return The corresponding chunk ID or -1 if no suitable chunk ID was found
      */
     public long unpinChunk(final long cidTableEntry){
-        return memoryPinning.unpinChunk(cidTableEntry);
+        return pinning.unpinChunk(cidTableEntry);
     }
 
     /**
@@ -192,7 +192,7 @@ public class MemoryManager {
      * @return Chunk data
      */
     public byte[] getPinned(final long cidTableEntry){
-        return memoryPinning.get(cidTableEntry);
+        return pinning.get(cidTableEntry);
     }
 
     /**
@@ -202,7 +202,7 @@ public class MemoryManager {
      * @param data Data to put
      */
     public void putPinned(final long cidTableEntry, final byte[] data){
-        memoryPinning.put(cidTableEntry, data);
+        pinning.put(cidTableEntry, data);
     }
 
 
@@ -220,7 +220,7 @@ public class MemoryManager {
      * @return The chunk id 0
      */
     public long createIndex(final int p_size) throws OutOfKeyValueStoreMemoryException, MemoryRuntimeException {
-        return memoryManagement.createIndex(p_size);
+        return management.createIndex(p_size);
     }
 
     /**
@@ -233,7 +233,7 @@ public class MemoryManager {
      * @return Chunk ID for the allocated chunk
      */
     public long create(final int p_size) throws OutOfKeyValueStoreMemoryException, MemoryRuntimeException {
-        return memoryManagement.create(p_size);
+        return management.create(p_size);
     }
 
     /**
@@ -248,7 +248,7 @@ public class MemoryManager {
      * @return The chunk id if successful, -1 if another chunk with the same id already exists.
      */
     public long create(final long p_chunkId, final int p_size) throws OutOfKeyValueStoreMemoryException, MemoryRuntimeException {
-        return memoryManagement.create(p_chunkId, p_size);
+        return management.create(p_chunkId, p_size);
     }
 
     /**
@@ -261,7 +261,7 @@ public class MemoryManager {
      * @return List of chunk ids matching the order of the size list
      */
     public long[] createMultiSizes(final int... p_sizes) {
-        return memoryManagement.createMultiSizes(p_sizes);
+        return management.createMultiSizes(p_sizes);
     }
 
     /**
@@ -276,7 +276,7 @@ public class MemoryManager {
      * @return List of chunk ids matching the order of the size list
      */
     public long[] createMultiSizes(final boolean p_consecutive, final int... p_sizes) {
-        return memoryManagement.createMultiSizes(p_consecutive, p_sizes);
+        return management.createMultiSizes(p_consecutive, p_sizes);
     }
 
     /**
@@ -288,7 +288,7 @@ public class MemoryManager {
      *         List of data structures. Chunk ids are automatically assigned after creation
      */
     public void createMulti(final DataStructure... p_dataStructures) {
-        memoryManagement.createMulti(p_dataStructures);
+        management.createMulti(p_dataStructures);
     }
 
     /**
@@ -302,7 +302,7 @@ public class MemoryManager {
      *         List of data structures. Chunk ids are automatically assigned after creation
      */
     public void createMulti(final boolean p_consecutive, final DataStructure... p_dataStructures) {
-        memoryManagement.createMulti(p_consecutive, p_dataStructures);
+        management.createMulti(p_consecutive, p_dataStructures);
     }
 
     /**
@@ -315,7 +315,7 @@ public class MemoryManager {
      * @return Chunk id list of the created chunks
      */
     public long[] createMulti(final int p_size, final int p_count) {
-        return memoryManagement.createMulti(p_size, p_count);
+        return management.createMulti(p_size, p_count);
     }
 
     /**
@@ -330,7 +330,7 @@ public class MemoryManager {
      * @return Chunk id list of the created chunks
      */
     public long[] createMulti(final int p_size, final int p_count, final boolean p_consecutive) {
-        return memoryManagement.createMulti(p_size, p_count, p_consecutive);
+        return management.createMulti(p_size, p_count, p_consecutive);
     }
 
     /**
@@ -349,7 +349,7 @@ public class MemoryManager {
      *         Specifies the actual number of slots used in the array (may be less than p_lengths)
      */
     public void createAndPutRecovered(final long[] p_chunkIDs, final byte[] p_data, final int[] p_offsets, final int[] p_lengths, final int p_usedEntries) {
-        memoryManagement.createAndPutRecovered(p_chunkIDs, p_data, p_offsets, p_lengths, p_usedEntries);
+        management.createAndPutRecovered(p_chunkIDs, p_data, p_offsets, p_lengths, p_usedEntries);
     }
 
     /**
@@ -362,11 +362,11 @@ public class MemoryManager {
      */
     //TODO LOCKS
     public int createAndPutRecovered(final DataStructure... p_dataStructures) {
-        return memoryManagement.createAndPutRecovered(p_dataStructures);
+        return management.createAndPutRecovered(p_dataStructures);
     }
 
     public int remove(final long p_chunkID, final boolean p_wasMigrated) {
-        return memoryManagement.remove(p_chunkID, p_wasMigrated);
+        return management.remove(p_chunkID, p_wasMigrated);
     }
 
     /**

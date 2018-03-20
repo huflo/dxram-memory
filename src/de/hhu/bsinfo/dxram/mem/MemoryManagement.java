@@ -39,7 +39,7 @@ public class MemoryManagement {
         m_memManagement = memoryManager;
         m_rawMemory = memoryManager.smallObjectHeap;
         m_cidTable = memoryManager.cidTable;
-        m_memStats = memoryManager.memoryInformation;
+        m_memStats = memoryManager.info;
 
         NODE_ID = m_cidTable.m_ownNodeID;
 

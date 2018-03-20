@@ -69,7 +69,7 @@ public final class MemoryTesting {
      * delete all chunks
      */
     public final void resetHeap(){
-        for (int i = 0; i <= m.memoryInformation.getHighestUsedLocalID(); i++) {
+        for (int i = 0; i <= m.info.getHighestUsedLocalID(); i++) {
             m.remove(i, false);
         }
     }
@@ -234,10 +234,10 @@ public final class MemoryTesting {
 
             if(Math.random() <= writeProbability){
                 //write access
-                m.memoryAccess.modifyTest(cids[selectedChunk], increment, selectedChunk);
+                m.access.modifyTest(cids[selectedChunk], increment, selectedChunk);
             } else{
                 //read access
-                long tmp = FastByteUtils.bytesToLong(m.memoryAccess.getTesting(cids[selectedChunk], ref, selectedChunk));
+                long tmp = FastByteUtils.bytesToLong(m.access.getTesting(cids[selectedChunk], ref, selectedChunk));
             }
         };
 
@@ -331,7 +331,7 @@ public final class MemoryTesting {
         if(testData){
             //In a lambda Runnable we can only work with final variables.
             //Therefore, i becomes a quasi-final variable by using an array.
-            for (int[] i = {0}; i[0] <= m.memoryInformation.getHighestUsedLocalID(); i[0]++) {
+            for (int[] i = {0}; i[0] <= m.info.getHighestUsedLocalID(); i[0]++) {
                 byte[] data = m.get(i[0]);
                 if(data != null){
                     if (Arrays.stream(strings).noneMatch(x -> x.matches(new String(data)))) {
@@ -425,7 +425,7 @@ public final class MemoryTesting {
             runs.incrementAndGet();
             wait(minDelayInMS, maxDelay);
 
-            long cid = getRandom(1, m.memoryInformation.getHighestUsedLocalID());
+            long cid = getRandom(1, m.info.getHighestUsedLocalID());
             if(Math.random() < changeProbability){
                 if(Math.random() < readProbability){
                     //read data
@@ -488,7 +488,7 @@ public final class MemoryTesting {
                 readCount.incrementAndGet();
 
             } else{
-                long remove = getRandom(1, m.memoryInformation.getHighestUsedLocalID());
+                long remove = getRandom(1, m.info.getHighestUsedLocalID());
                 if(m.remove(remove, false) != -1){
                     writeCount.incrementAndGet();
                 }

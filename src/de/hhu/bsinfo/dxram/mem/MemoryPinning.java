@@ -79,14 +79,17 @@ public class MemoryPinning {
      * @param cidTableEntry Entry
      * @param data Data to put
      */
-    public void put(final long cidTableEntry, final byte[] data){
+    public boolean put(final long cidTableEntry, final byte[] data){
         assert data != null;
 
         long address = ADDRESS.get(cidTableEntry);
-        assert smallObjectHeap.assertMemoryBounds(address);
+        boolean ok = smallObjectHeap.assertMemoryBounds(address);
 
         long cidLF = LENGTH_FIELD.get(cidTableEntry);
 
-        smallObjectHeap.writeBytes(address, 0, data, 0, data.length, cidLF);
+        if(ok)
+            smallObjectHeap.writeBytes(address, 0, data, 0, data.length, cidLF);
+
+        return ok;
     }
 }
