@@ -28,10 +28,10 @@ public class DXRAMMemory{
         boolean writeLock = Boolean.parseBoolean(args[arg++]);
 
         String branch = args[arg++];
-        long rounds = Long.parseLong(args[arg++]);
+        int rounds = Integer.parseInt(args[arg++]);
         long nOperations = Long.parseLong(args[arg++]);
         int nThreads = Integer.parseInt(args[arg++]);
-        long initialChunks = Long.parseLong(args[arg++]);
+        int initialChunks = Integer.parseInt(args[arg++]);
         int initMinSize = Integer.parseInt(args[arg++]);
         int initMaxSize = Integer.parseInt(args[arg++]);
         double createProbability = Double.parseDouble(args[arg++]);
@@ -43,10 +43,13 @@ public class DXRAMMemory{
         int maxSizeInByte = Integer.parseInt(args[arg]);
 
         MemoryManager memoryManager = new MemoryManager(nodeID, heapSize, blockSize);
-        MemoryEvaluation eval = new MemoryEvaluation(memoryManager, "./eval/" + branch + "/", readLock, writeLock);
+        MemoryEvaluation eval = new MemoryEvaluation(memoryManager, "./eval/" + branch + "/", initialChunks, initMinSize, initMaxSize);
+        eval.setLocks(readLock, writeLock);
+        eval.setRounds(rounds);
+        eval.setOperations(nOperations);
+        eval.setThreads(nThreads);
 
-        eval.accessSimulation(rounds, nOperations, nThreads, initialChunks, initMinSize, initMaxSize, createProbability,
-                readProbability,writeProbability, minDelayInMS, maxDelay, minSize, maxSizeInByte);
+        eval.accessSimulation(createProbability, readProbability, writeProbability, minSize, maxSizeInByte);
 
         memoryManager.shutdownMemory();
     }
