@@ -103,15 +103,22 @@ public class MemoryEvaluation {
         resultFolder = tmpPath;
     }
 
-    public void setLocks(final boolean readLock, final boolean writeLock, final boolean disableReadLock) {
+    public void setLocks(final boolean readLock, final boolean writeLock, final boolean disableReadLock, final boolean disableWriteLock) {
         memory.setLocks(readLock, writeLock);
         memory.disableReadLock(disableReadLock);
+        memory.disableWriteLock(disableWriteLock);
 
-        if(disableReadLock)
+        if(disableReadLock && disableWriteLock)
+            fileNameExtension = "no_locks";
+        else if (disableReadLock)
             fileNameExtension = String.format("write_%s_-_no_read_lock", (writeLock) ? "w":"r");
+        else if (disableWriteLock)
+            fileNameExtension = String.format("read_%s_-_no_write_lock", (readLock) ? "w":"r");
         else
             fileNameExtension = String.format("read_%s_-_write_%s", (readLock) ? "r":"w", (writeLock) ? "w":"r");
+
     }
+
 
     /**
      *
