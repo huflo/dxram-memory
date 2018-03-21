@@ -30,18 +30,26 @@ public class DXMemoryEvaluation {
 
 
         MemoryManager memory = new MemoryManager(nodeID, heapSize, (int)Math.pow(2,22));
-        MemoryEvaluation evaluation = new MemoryEvaluation(memory, "./eval/" + branch, initChunks, initMin, initMax);
+        MemoryEvaluation evaluation = new MemoryEvaluation(memory,
+                System.getProperty("user.home") + "/eval/" + branch,
+                initChunks, initMin, initMax);
         evaluation.setThreads(threads);
         evaluation.setOperations(operations);
         evaluation.setRounds(rounds);
 
         for (double[] prob : probabilities) {
-            if (prob[0] == 0.0){
+            //evaluate pinning
+            if (prob[0] == 0.0 && prob[1] == 0.0){
                 evaluation.accessSimulationPinning(prob[2]);
             }
 
+            //evaluate weak consistency
+            evaluation.setLocks(true, true, true);
+            evaluation.accessSimulation(prob[0], prob[1], prob[2], 16, 2048);
+
+            //evaluate strong consistency
             for (boolean[] lock : locks) {
-                evaluation.setLocks(lock[0], lock[1]);
+                evaluation.setLocks(lock[0], lock[1], false);
                 evaluation.accessSimulation(prob[0], prob[1], prob[2], 16, 2048);
             }
 

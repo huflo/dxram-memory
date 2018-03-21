@@ -103,10 +103,14 @@ public class MemoryEvaluation {
         resultFolder = tmpPath;
     }
 
-
-    public void setLocks(final boolean readLock, final boolean writeLock) {
+    public void setLocks(final boolean readLock, final boolean writeLock, final boolean disableReadLock) {
         memory.setLocks(readLock, writeLock);
-        fileNameExtension = String.format("read_%s_-_write_%s", (readLock) ? "r":"w", (writeLock) ? "w":"r" );
+        memory.disableReadLock(disableReadLock);
+
+        if(disableReadLock)
+            fileNameExtension = String.format("write_%s_-_no_read_lock", (writeLock) ? "w":"r");
+        else
+            fileNameExtension = String.format("read_%s_-_write_%s", (readLock) ? "r":"w", (writeLock) ? "w":"r");
     }
 
     /**
@@ -272,6 +276,7 @@ public class MemoryEvaluation {
             }
             measurementHelper.newRound();
         }
+        memory.disableReadLock(false);
     }
 
     /**

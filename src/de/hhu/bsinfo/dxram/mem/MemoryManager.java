@@ -36,6 +36,7 @@ public class MemoryManager {
 
     private boolean m_readLock = true;
     private boolean m_writeLock = true;
+    private boolean m_doReadLock = true;
 
     public MemoryManager(final short p_nodeID, final long p_heapSize, final int p_maxBlockSize) {
         smallObjectHeap = new SmallObjectHeap(new StorageUnsafeMemory(), p_heapSize, p_maxBlockSize);
@@ -406,14 +407,18 @@ public class MemoryManager {
      * @param  p_directEntryAddress
      *              Position of the CIDTable entry
      * @return
-     *          True if a lock is received, else false
+     *          True if a lock is received or on weak consistency else false
      *
      */
     boolean switchableReadLock(final long p_directEntryAddress){
-        if(m_readLock)
-            return cidTable.directReadLock( p_directEntryAddress);
-        else
-            return cidTable.directWriteLock( p_directEntryAddress);
+        if (m_doReadLock) {
+            if (m_readLock)
+                return cidTable.directReadLock(p_directEntryAddress);
+            else
+                return cidTable.directWriteLock(p_directEntryAddress);
+        }
+
+        return true;
     }
 
     /**
@@ -424,14 +429,18 @@ public class MemoryManager {
      * @param  p_directEntryAddress
      *              Position of the CIDTable entry
      * @return
-     *          True if a unlock was successful, else false
+     *          True if a unlock was successful or on weak consistency, else false
      *
      */
     boolean switchableReadUnlock(final long p_directEntryAddress){
-        if(m_readLock)
-            return cidTable.directReadUnlock( p_directEntryAddress);
-        else
-            return cidTable.directWriteUnlock( p_directEntryAddress);
+        if (m_doReadLock) {
+            if (m_readLock)
+                return cidTable.directReadUnlock(p_directEntryAddress);
+            else
+                return cidTable.directWriteUnlock(p_directEntryAddress);
+        }
+
+        return true;
     }
 
     /**
@@ -482,6 +491,10 @@ public class MemoryManager {
     final void setLocks(final boolean p_readLock, final boolean p_writeLock) {
         m_readLock = p_readLock;
         m_writeLock = p_writeLock;
+    }
+
+    final void disableReadLock(final boolean disableReadLock) {
+        m_doReadLock = !disableReadLock;
     }
 
     /**
