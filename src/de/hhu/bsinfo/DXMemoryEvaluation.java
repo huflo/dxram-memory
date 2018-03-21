@@ -38,18 +38,22 @@ public class DXMemoryEvaluation {
         evaluation.setRounds(rounds);
 
         for (double[] prob : probabilities) {
-            //evaluate pinning
             if (prob[0] == 0.0 && prob[1] == 0.0){
+                //evaluate pinning
                 evaluation.accessSimulationPinning(prob[2]);
+
+                //test no locks
+                evaluation.setLocks(true, true, true, true);
+                evaluation.accessSimulation(prob[0], prob[1], prob[2], 16, 2048);
             }
 
             //evaluate weak consistency
-            evaluation.setLocks(true, true, true);
+            evaluation.setLocks(true, true, true, false);
             evaluation.accessSimulation(prob[0], prob[1], prob[2], 16, 2048);
 
             //evaluate strong consistency
             for (boolean[] lock : locks) {
-                evaluation.setLocks(lock[0], lock[1], false);
+                evaluation.setLocks(lock[0], lock[1], false, false);
                 evaluation.accessSimulation(prob[0], prob[1], prob[2], 16, 2048);
             }
 

@@ -36,6 +36,7 @@ public class MemoryManager {
     private boolean m_readLock = true;
     private boolean m_writeLock = true;
     private boolean m_doReadLock = true;
+    private boolean m_doWriteLock = true;
 
     public MemoryManager(final short p_nodeID, final long p_heapSize, final int p_maxBlockSize) {
         smallObjectHeap = new SmallObjectHeap(new StorageUnsafeMemory(), p_heapSize, p_maxBlockSize);
@@ -202,6 +203,8 @@ public class MemoryManager {
     final boolean readLockDisabled() {
         return !m_doReadLock;
     }
+
+    final void disableWriteLock(final boolean disableWriteLock) { m_doWriteLock = !disableWriteLock;}
 
     /**
      * @author Florian Hucke (florian.hucke@hhu.de) on 28.02.18
