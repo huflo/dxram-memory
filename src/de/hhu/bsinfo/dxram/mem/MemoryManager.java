@@ -199,6 +199,10 @@ public class MemoryManager {
         m_doReadLock = !disableReadLock;
     }
 
+    final boolean readLockDisabled() {
+        return !m_doReadLock;
+    }
+
     /**
      * @author Florian Hucke (florian.hucke@hhu.de) on 28.02.18
      * @projectname dxram-memory
