@@ -103,10 +103,12 @@ public class MemoryEvaluation {
         resultFolder = tmpPath;
     }
 
-    public void setLocks(final boolean readLock, final boolean writeLock, final boolean disableReadLock, final boolean disableWriteLock) {
+
+    public void setLocks(final boolean readLock, final boolean writeLock, final boolean disableReadLock, final boolean disableWriteLock, final int waitHandle) {
         memory.setLocks(readLock, writeLock);
         memory.disableReadLock(disableReadLock);
         memory.disableWriteLock(disableWriteLock);
+        memory.cidTable.setThreadWaitHandle(waitHandle);
 
         if(disableReadLock && disableWriteLock)
             fileNameExtension = "no_locks";
@@ -116,6 +118,10 @@ public class MemoryEvaluation {
             fileNameExtension = String.format("read_%s_-_no_write_lock", (readLock) ? "w":"r");
         else
             fileNameExtension = String.format("read_%s_-_write_%s", (readLock) ? "r":"w", (writeLock) ? "w":"r");
+
+        if(waitHandle != 0 && waitHandle < 3) {
+            fileNameExtension += "_" + ((waitHandle==1) ? "yield":"parkNanos");
+        }
 
     }
 

@@ -20,6 +20,8 @@ import de.hhu.bsinfo.dxutils.BitMask;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.concurrent.locks.LockSupport;
+
 import static de.hhu.bsinfo.dxram.mem.CIDTableEntry.*;
 
 //import de.hhu.bsinfo.dxutils.stats.StatisticsOperation;
@@ -62,6 +64,10 @@ final class CIDTable {
     private long m_nextLocalID;
 
     private TranslationCache[] m_cache;
+
+    //For evaluation purpose
+    int selectedWaitOperation = 0;
+
 
     /**
      * Creates an instance of CIDTable
@@ -622,7 +628,7 @@ final class CIDTable {
                 return false;
 
             if((value & WRITE_ACCESS.BITMASK) == WRITE_ACCESS.BITMASK){
-                Thread.yield();
+                threadWaitHandle();
                 continue;
             }
 
@@ -632,11 +638,12 @@ final class CIDTable {
 
         // wait until no present read access
         while((m_rawMemory.directReadLong(p_directEntryAddress) & READ_ACCESS.BITMASK) != 0){
-            Thread.yield();
+            threadWaitHandle();
         }
 
         return run;
     }
+
 
     /**
      * Release a read lock on a CID
@@ -674,10 +681,13 @@ final class CIDTable {
 
             if(m_rawMemory.directCompareAndSwapLong(p_directEntryAddress, value, value & ~WRITE_ACCESS.BITMASK))
                 break;
+
+            threadWaitHandle();
         }
 
         return run;
     }
+
 
     /**
      * Get the address of the table directory
@@ -843,6 +853,29 @@ final class CIDTable {
 
         return run;
     }
+
+    //Eval-------------------------------
+
+    /**
+     * Select a wait strategy
+     *
+     * @param p_selectedWaitOperation If 1 select Thread.yield(), if 2 select LockSupport.parkNanos(1) else don't wait
+     */
+    void setThreadWaitHandle(final int p_selectedWaitOperation) {
+        selectedWaitOperation = p_selectedWaitOperation;
+    }
+
+    /**
+     * Execute selected wait strategy (default: don't wait)
+     */
+    private void threadWaitHandle() {
+        if(selectedWaitOperation == 1)
+            Thread.yield();
+        else if(selectedWaitOperation == 2)
+            LockSupport.parkNanos(1);
+    }
+
+    //-----------------------------------
 
     /**
      * Stores free LocalIDs
