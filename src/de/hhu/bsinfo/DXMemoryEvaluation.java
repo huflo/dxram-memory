@@ -43,20 +43,21 @@ public class DXMemoryEvaluation {
                 evaluation.accessSimulationPinning(prob[2]);
 
                 //test no locks
-                evaluation.setLocks(true, true, true, true);
+                evaluation.setLocks(true, true, true, true, 0);
                 evaluation.accessSimulation(prob[0], prob[1], prob[2], 16, 2048);
             }
 
-            //evaluate weak consistency
-            evaluation.setLocks(true, true, true, false);
-            evaluation.accessSimulation(prob[0], prob[1], prob[2], 16, 2048);
-
-            //evaluate strong consistency
-            for (boolean[] lock : locks) {
-                evaluation.setLocks(lock[0], lock[1], false, false);
+            for(int waitHandle = 0; waitHandle < 3; waitHandle++) {
+                //evaluate weak consistency
+                evaluation.setLocks(true, true, true, false, waitHandle);
                 evaluation.accessSimulation(prob[0], prob[1], prob[2], 16, 2048);
-            }
 
+                //evaluate strong consistency
+                for (boolean[] lock : locks) {
+                    evaluation.setLocks(lock[0], lock[1], false, false, waitHandle);
+                    evaluation.accessSimulation(prob[0], prob[1], prob[2], 16, 2048);
+                }
+            }
         }
 
         memory.shutdownMemory();
