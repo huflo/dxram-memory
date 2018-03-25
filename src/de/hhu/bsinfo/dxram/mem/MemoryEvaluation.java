@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -216,9 +217,9 @@ public class MemoryEvaluation {
         double removeLimit = createProbability + removeProbability;
         double writeLimit = removeLimit + writeProbability;
 
-        String baseFilename = String.format("%2.3f_%2.3f_%2.3f", createProbability, removeProbability, writeProbability);
+        String baseFilename = String.format(Locale.US, "%2.3f_%2.3f_%2.3f", createProbability, removeProbability, writeProbability);
 
-        String desc = String.format("operations: %d, threads: %d, init chunks: %d, inti size: [min: %d ,max: %d], " +
+        String desc = String.format(Locale.US, "operations: %d, threads: %d, init chunks: %d, inti size: [min: %d ,max: %d], " +
                 "probabilities: [create: %2.3f, remove: %2.3f, read: %2.3f, write: %2.3f], delay:[min: %d, max: %d], size:[min: %d, max:%d]",
                 operations, threads, initialChunks, initMinSize, initMaxSize, createProbability, removeProbability,
                 1-writeLimit, writeProbability, minDelay, maxDelay, minSize, maxSize);
@@ -301,9 +302,9 @@ public class MemoryEvaluation {
     public final void accessSimulationPinning(final double writeProbability) {
         AtomicLong putCounter = new AtomicLong(0);
 
-        String baseFilename = String.format("%2.3f", writeProbability);
+        String baseFilename = String.format(Locale.US, "%2.3f_%2.3f_%2.3f", 0.0, 0.0, writeProbability);
 
-        String desc = String.format("operations: %d, threads: %d, init chunks: %d, inti size: [min: %d ,max: %d], " +
+        String desc = String.format(Locale.US, "operations: %d, threads: %d, init chunks: %d, inti size: [min: %d ,max: %d], " +
                         "probabilities: [read: %2.3f, write: %2.3f]",
                 operations, threads, initialChunks, initMinSize, initMaxSize, 1-writeProbability, writeProbability);
 
