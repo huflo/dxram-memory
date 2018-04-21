@@ -543,14 +543,14 @@ final class CIDTable {
             //3. no Thread Handle
             if ((value & READ_ACCESS.BITMASK) == READ_ACCESS.BITMASK ||
                     (value & WRITE_ACCESS.BITMASK) == WRITE_ACCESS.BITMASK){
-                Thread.yield();
+                threadWaitHandle();
                 continue;
             }
 
             if (m_rawMemory.directCompareAndSwapLong(p_directEntryAddress, value, value + READ_INCREMENT))
                 break;
 
-            Thread.yield();
+            threadWaitHandle();
         }
 
         return run;
@@ -593,7 +593,7 @@ final class CIDTable {
             if(m_rawMemory.directCompareAndSwapLong(p_directEntryAddress, value, value - READ_INCREMENT))
                 break;
 
-            Thread.yield();
+            threadWaitHandle();
 
         }
         return run;
