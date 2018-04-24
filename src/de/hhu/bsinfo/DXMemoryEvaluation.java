@@ -38,14 +38,14 @@ public class DXMemoryEvaluation {
         evaluation.setRounds(rounds);
 
         for (double[] prob : probabilities) {
-            if (prob[0] == 0.0 && prob[1] == 0.0) {
+            if (prob[0] == 0.0 && prob[1] == 0.0){
                 //evaluate pinning
                 evaluation.accessSimulationPinning(prob[2]);
-            }
 
-            //test no locks
-            evaluation.setLocks(true, true, true, true, 0);
-            evaluation.accessSimulation(prob[0], prob[1], prob[2], 16, 2048);
+                //test no locks
+                evaluation.setLocks(true, true, true, true, 0);
+                evaluation.accessSimulation(prob[0], prob[1], prob[2], 16, 2048);
+            }
 
             for(int waitHandle = 0; waitHandle < 3; waitHandle++) {
                 //evaluate weak consistency
