@@ -17,23 +17,22 @@ You can find the script in the project root.
 ## Starting DXRAM-Memory
 *DXRAM-Memory* requires *JAVA 8*. Furthermore it depends on a few extra libaries, which can be found in the `lib/` folder.
 
-To start *DXRAM-Memory* testing util you have to run the **BASH** script, with:
-```
-bash start-dxram-memory.sh de.hhu.bsinfo.DXMemoryTesting 
-```
-Like the build script you can find this script in the root folder of the project.
+
 
 If you want to run a evaluation use the evaluation **BASH** script. Run
 something like:
 ```
 nohup ./evaluation.sh $((2**34)) 1000 4 $((10**7)) 5 > ~/${PWD##*/}.output &
 ```
+
+Like the build script you can find this script in the root folder of the project.
+
 This evaluation allocates 16GiB RAM and create 1000 inital chunks.  run 10
 million operations with 4 threads. and do it 5 round. 
 
 Use nohup because this evaluation maybe take a few hours.
 
-This script will build and run the evaluation on master and the old\_logic branch.
+This script will build and run the evaluation on the old\_implementation branch.
 
 The result are saved as csv files in the ~/eval folder.
 
